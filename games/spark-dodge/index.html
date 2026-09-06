@@ -118,7 +118,10 @@ nameEl.addEventListener('keydown', e => {
 });
 
 // The receptor is a cradle between two poles anchored in the membrane.
+// `r` is the cradle half-width; the stroke adds half a line width on each side.
 const player = { x: W / 2, y: MEMBRANE_TOP - 46, r: 26, vx: 0 };
+const EDGE = 32;
+const clampX = x => Math.max(EDGE, Math.min(W - EDGE, x));
 let antibodies = [], score = 0, tick = 0, over = false;
 const keys = new Set();
 
@@ -147,7 +150,7 @@ function pointerTo(clientX) {
   if (over) return;
   const rect = canvas.getBoundingClientRect();
   const x = (clientX - rect.left) * (W / rect.width);
-  player.x = Math.max(player.r, Math.min(W - player.r, x));
+  player.x = clampX(x);
 }
 canvas.addEventListener('mousemove', e => pointerTo(e.clientX));
 canvas.addEventListener('touchmove', e => { pointerTo(e.touches[0].clientX); e.preventDefault(); }, { passive: false });
@@ -181,7 +184,7 @@ function update() {
   if (keys.has('ArrowLeft')) player.vx -= 0.8;
   if (keys.has('ArrowRight')) player.vx += 0.8;
   player.vx *= 0.86;
-  player.x = Math.max(player.r, Math.min(W - player.r, player.x + player.vx));
+  player.x = clampX(player.x + player.vx);
 
   spawn();
   for (const a of antibodies) { a.y += a.vy; a.rot += a.vr; }
@@ -293,10 +296,12 @@ function drawReceptor() {
   ctx.quadraticCurveTo(x, top + 18, x + 26, top - 12);
   ctx.stroke();
 
+  // Below the cradle so a caught antibody never covers it, and inset so it
+  // stays readable at either edge.
   ctx.fillStyle = 'rgba(247,237,234,0.8)';
   ctx.font = '600 11px system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('FcRn receptor', x, top - 20);
+  ctx.fillText('FcRn receptor', Math.max(42, Math.min(W - 42, x)), top + 36);
 }
 
 function draw() {
