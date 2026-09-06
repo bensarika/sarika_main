@@ -1,0 +1,26 @@
+{
+  "version": "0.1.0",
+  "verified_on": "2026-09-06",
+  "checks": {
+    "json_documents_parsed": 5,
+    "schema_meta_validation": "passed (Draft 2020-12)",
+    "example_models_schema_valid": 3,
+    "populated_example_id_references_resolved": 30,
+    "example_source_page_locations_in_range": 2,
+    "source_inventory_counts": "17 packages; 11 detailed selected-section reviews; 6 structural checks",
+    "canonical_outline_sections": 15,
+    "easi_32_to_8": {
+      "change": -24,
+      "percent_change": -75.0,
+      "easi75": true
+    },
+    "response_threshold_equality_and_below": "passed",
+    "zero_baseline_percent_calculation": "rejected as undefined"
+  },
+  "limitations": [
+    "This verifies the delivered scaffold and selected calculations, not an implemented PDF analyzer.",
+    "The eight semantic fixtures and 22 analyzer rules are specifications; no claim that a production validator executes them all.",
+    "A valid partial model does not establish protocol completeness or clinical appropriateness.",
+    "Page-bound checks do not independently establish extraction accuracy; source excerpts were reviewed separately."
+  ]
+}

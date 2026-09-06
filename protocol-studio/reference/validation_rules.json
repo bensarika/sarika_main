@@ -1,0 +1,348 @@
+{
+  "version": "0.1.0",
+  "interpretation": "This is a product requirements catalog, not an implemented PDF analyzer or validated clinical decision system. Candidate conflicts require human adjudication.",
+  "rules": [
+    {
+      "id": "R01",
+      "name": "Reference integrity",
+      "check_type": "deterministic",
+      "default_result": "error",
+      "applies_when": "Any reference is populated",
+      "check": "All object references resolve to IDs of the expected type. Duplicate IDs are errors within a model.",
+      "qualification": "Schema validation alone does not check foreign keys.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R02",
+      "name": "Endpoint definition",
+      "check_type": "conditional_completeness",
+      "default_result": "incomplete",
+      "applies_when": "Endpoint is intended for the operative protocol",
+      "check": "Require measurement identity/version as applicable, time and anchor, transformation, aggregation, baseline definition for change, and responder/subset rules where relevant.",
+      "qualification": "An intentionally partial extraction is incomplete, not proof that the source protocol omitted these fields.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R03",
+      "name": "Expression arithmetic",
+      "check_type": "deterministic",
+      "default_result": "error",
+      "applies_when": "A numeric or logical expression is evaluated",
+      "check": "Check operator arity, dimensional consistency, score domain, baseline denominator, sign, inclusive bounds and null behavior.",
+      "qualification": "Do not create response values from undefined arithmetic or use hidden rounding.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R04",
+      "name": "Schedule coverage",
+      "check_type": "cross_view",
+      "default_result": "candidate_conflict",
+      "applies_when": "An endpoint or narrative rule requires an observation",
+      "check": "Find a matching assessment at an eligible scheduled or event-triggered encounter; account for the window and within-visit order.",
+      "qualification": "Review footnotes before flagging an apparently absent check mark.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R05",
+      "name": "Scope and version conflict",
+      "check_type": "cross_view",
+      "default_result": "candidate_conflict",
+      "applies_when": "Two assertions concern the same semantic field",
+      "check": "Compare values only where study, version, region, population, period and applicability overlap.",
+      "qualification": "Historical amendment text and different trial designs are not automatically contradictions.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R06",
+      "name": "Schedule footnote loss",
+      "check_type": "cross_view",
+      "default_result": "candidate_conflict",
+      "applies_when": "A SoA cell has a footnote or merged header",
+      "check": "Retain predose, subset, optional consent, repeat, remote and triggered conditions on the scheduled activity.",
+      "qualification": "A table cell may encode several actions.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R07",
+      "name": "Dose calendar consistency",
+      "check_type": "deterministic",
+      "default_result": "error",
+      "applies_when": "The dose calendar can be expanded from accepted rules",
+      "check": "Check loading/maintenance overlaps, route and units, repeat limits, dose conditions and administration count.",
+      "qualification": "Do not expand redacted or unresolved doses into invented schedules.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R08",
+      "name": "Blinding calendar",
+      "check_type": "human_review",
+      "default_result": "candidate_conflict",
+      "applies_when": "Treatment assignment is intended to remain concealed for a role",
+      "check": "Compare observable administration frequency, presentations, placebo administrations and role-specific unblinding dates.",
+      "qualification": "A difference suggests a masking risk but does not by itself prove unblinding.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R09",
+      "name": "Participant transition coverage",
+      "check_type": "deterministic",
+      "default_result": "candidate_conflict",
+      "applies_when": "A period has response-based branching",
+      "check": "Check entry and exit conditions, prior assignment, rescue history, allocations and terminal states for gaps and overlaps.",
+      "qualification": "If predicates contain investigator judgment, request adjudication instead of claiming exhaustive proof.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R10",
+      "name": "Time anchor and boundary",
+      "check_type": "deterministic",
+      "default_result": "candidate_conflict",
+      "applies_when": "An action or event has time restrictions",
+      "check": "Resolve named anchors, Day 0/Day 1 conventions, visit windows, exact-week inclusion, consecutive visits and last-dose versus end-of-period clocks.",
+      "qualification": "Do not silently decide an ambiguous boundary.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R11",
+      "name": "Rescue linkage",
+      "check_type": "conditional_completeness",
+      "default_result": "incomplete",
+      "applies_when": "Rescue is permitted or represented as an intercurrent event",
+      "check": "Require operational permission/escalation, treatment disposition, continued observations and event-specific links to each relevant estimand and analysis.",
+      "qualification": "Operational drug action is not determined by statistical strategy.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R12",
+      "name": "Estimand completeness",
+      "check_type": "conditional_completeness",
+      "default_result": "incomplete",
+      "applies_when": "A treatment effect is intended for interpretation",
+      "check": "Resolve population, treatment conditions, variable, population summary and strategies for relevant intercurrent events, including reasons and precedence.",
+      "qualification": "A single event can have different strategies under different estimands.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R13",
+      "name": "Observed versus analysis value",
+      "check_type": "deterministic",
+      "default_result": "error",
+      "applies_when": "An analysis excludes, replaces or imputes a value",
+      "check": "Keep the original observation and provenance; store derived analysis values and their rules separately.",
+      "qualification": "Do not transform all rescued measurements into missing source data.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R14",
+      "name": "Sensitivity versus supplementary",
+      "check_type": "semantic_review",
+      "default_result": "candidate_conflict",
+      "applies_when": "An analysis is labeled sensitivity or supplementary",
+      "check": "Compare the treatment question and estimand IDs. A changed estimand is supplementary under the normalized E9(R1) interpretation.",
+      "qualification": "Preserve the source-native label and request review of the mapping.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R15",
+      "name": "Framework-specific statistical inputs",
+      "check_type": "conditional_completeness",
+      "default_result": "incomplete",
+      "applies_when": "An analysis framework has been chosen",
+      "check": "Require estimator and assumptions. Require testing error rules for tests, priors and posterior specifications for Bayesian methods, and a suitable sample-size rationale.",
+      "qualification": "Do not demand hypothesis-testing alpha/power for a study explicitly using estimation without testing.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R16",
+      "name": "Testing dependency graph",
+      "check_type": "deterministic",
+      "default_result": "error",
+      "applies_when": "A hierarchical or other dependent testing family is specified",
+      "check": "Require defined hypotheses, acyclic prerequisites, clear continuation/stopping rules and scoped decision thresholds.",
+      "qualification": "Monotone dose order is not a universal rule; use the specified hierarchy.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R17",
+      "name": "Safety instruction completeness",
+      "check_type": "conditional_completeness",
+      "default_result": "incomplete",
+      "applies_when": "A safety trigger requires an action",
+      "check": "Resolve threshold and units or responsible clinical judgment, confirmation/retest if applicable, action owner, deadline/anchor, follow-up and restart conditions where relevant.",
+      "qualification": "A borrowed threshold from another mechanism is a proposed choice, not extracted evidence.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R18",
+      "name": "Discontinuation and follow-up",
+      "check_type": "cross_view",
+      "default_result": "candidate_conflict",
+      "applies_when": "Treatment is interrupted or permanently stopped",
+      "check": "Keep drug state, study-participation state, consent scope and follow-up obligations separate; reconcile observation duration with defined safety collection windows.",
+      "qualification": "A treatment stop does not entail study withdrawal.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R19",
+      "name": "Source availability",
+      "check_type": "evidence_review",
+      "default_result": "incomplete",
+      "applies_when": "Content is absent from extraction or externally referenced",
+      "check": "Distinguish redaction, image-only content, extraction failure, missing package pages, unavailable dependency and true not-reported status.",
+      "qualification": "A page-count discrepancy is a package limitation signal, not a clinical protocol defect.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R20",
+      "name": "Provenance and adoption",
+      "check_type": "evidence_review",
+      "default_result": "incomplete",
+      "applies_when": "A value enters the accepted authoring model",
+      "check": "Record origin, source version/location, normalization, review state and adoption. Proposed text and conflicting assertions require explicit resolution.",
+      "qualification": "Model confidence cannot substitute for evidence.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R21",
+      "name": "Planning versus results",
+      "check_type": "deterministic",
+      "default_result": "candidate_conflict",
+      "applies_when": "Enrollment or analysis timing is imported from a registry/publication",
+      "check": "Keep planned sample size, permissible recruitment adjustments and actually enrolled counts separate.",
+      "qualification": "A later results value cannot overwrite the protocol design field.",
+      "implementation_status": "specified_not_implemented"
+    },
+    {
+      "id": "R22",
+      "name": "Change impact",
+      "check_type": "graph_traversal",
+      "default_result": "review_task",
+      "applies_when": "An accepted semantic object changes",
+      "check": "Traverse dependent endpoints, estimands, analyses, treatment paths, schedules, safety rules and generated views; identify affected reviewers and dependencies.",
+      "qualification": "Change impact reports do not authorize an amendment.",
+      "implementation_status": "specified_not_implemented"
+    }
+  ],
+  "source_regression_candidates": [
+    {
+      "id": "lebrikizumab_amendment_schedule",
+      "source_id": "NCT03443024.Prot_000",
+      "location": "Amendment 2 change summary",
+      "rule_ids": [
+        "R04",
+        "R06",
+        "R05"
+      ],
+      "case": "Laboratory and early-termination assessment corrections provide source-version fixtures.",
+      "adjudication_status": "source_correction_observed; fixture extraction still required"
+    },
+    {
+      "id": "lebrikizumab_easi_direction",
+      "source_id": "NCT04146363.Prot_000",
+      "physical_pdf_pages": [
+        36,
+        42
+      ],
+      "rule_ids": [
+        "R03",
+        "R05",
+        "R09"
+      ],
+      "case": "Candidate EASI direction disagreement in maintenance-loss wording.",
+      "adjudication_status": "candidate_only; sponsor/statistical adjudication required"
+    },
+    {
+      "id": "nemolizumab_masking",
+      "source_id": "NCT03985943.Prot_000",
+      "location": "8.1 and 8.4",
+      "rule_ids": [
+        "R08",
+        "R09"
+      ],
+      "case": "Maintenance schedule includes placebo administrations and prior-treatment-dependent paths.",
+      "adjudication_status": "observed; full calendar fixture still required"
+    },
+    {
+      "id": "gsk_estimation",
+      "source_id": "NCT05999799.Prot_002",
+      "physical_pdf_pages": [
+        48,
+        99,
+        101
+      ],
+      "rule_ids": [
+        "R12",
+        "R13",
+        "R15"
+      ],
+      "case": "Mixed event strategies and a Bayesian estimation framework.",
+      "adjudication_status": "observed; full estimand fixture still required"
+    },
+    {
+      "id": "temtokibart_outcome_identity",
+      "source_ids": [
+        "NCT04922021.Prot_SAP_000",
+        "NCT05923099.Prot_SAP_000"
+      ],
+      "physical_pdf_pages_by_source": {
+        "NCT04922021.Prot_SAP_000": [
+          98
+        ],
+        "NCT05923099.Prot_SAP_000": [
+          40
+        ]
+      },
+      "rule_ids": [
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "case": "Different transformations across distinct phase 2 studies.",
+      "adjudication_status": "partial schema examples supplied"
+    },
+    {
+      "id": "upadacitinib_safety_actions",
+      "source_id": "NCT03569293.Prot_002",
+      "physical_pdf_pages": [
+        73,
+        74,
+        75
+      ],
+      "rule_ids": [
+        "R17",
+        "R18"
+      ],
+      "case": "Conditional laboratory management and recovery decisions.",
+      "adjudication_status": "observed; clinical rule fixture still required"
+    }
+  ],
+  "expression_contract": {
+    "arity": {
+      "add": "2+",
+      "subtract": 2,
+      "multiply": "2+",
+      "divide": 2,
+      "abs": 1,
+      "min": "1+",
+      "max": "1+",
+      "eq": 2,
+      "ne": 2,
+      "gt": 2,
+      "gte": 2,
+      "lt": 2,
+      "lte": 2,
+      "and": "2+",
+      "or": "2+",
+      "not": 1,
+      "in": 2,
+      "exists": 1,
+      "count": 1,
+      "consecutive": 2
+    },
+    "null_behavior": "Missing input propagates unknown unless an explicit missingness or existence rule applies; never coerce unknown to false.",
+    "temporal_operators": "consecutive(sequence, required_count) requires a declared, ordered eligible-encounter sequence; skipped visits and missing observations require an explicit policy.",
+    "type_contract": "in expects scalar plus collection; count expects a collection; consecutive expects an ordered predicate sequence and integer count. Collections are resolved fields or supported expression results; this scaffold has no collection literal node.",
+    "units": "All numeric operations require compatible dimensions. The implementation must validate and version unit conversions.",
+    "execution_boundary": "Schema describes expressions; it does not implement their interpreter."
+  }
+}
