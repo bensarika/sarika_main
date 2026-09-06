@@ -253,6 +253,34 @@ def run(args):
   if interpretation.get('unsupported'):
    result={'status':'unsupported','reason':interpretation.get('reason'),'points':[]}
    write_json(out/'result.json',result);return result
+  # No legend column, or a legend of words only. The marks are still printed and
+  # they are thicker than every line on the sheet, so Python measures where they
+  # are before anything is proposed: a reader whose coordinates land on white
+  # paper cannot then be confirmed by mining around those same coordinates. The
+  # marks seed every series, so which group each belongs to stays an open question
+  # for the reviewer instead of being decided by the detector.
+  if (config.get('detect_marks_without_legend',True)
+      and not any(s.get('template_bbox') for s in interpretation['series'])):
+   found=markers.detect_marks(out/'working.png',interpretation['plot_bbox'])
+   if found:
+    lone=min((m for m in found if not m['crowded']),key=lambda m:m['width']*m['height'],default=None)
+    write_json(out/'detected_marks.json',{'source':'thickness_cores','count':len(found),
+      'marks_suggested':sum(m['marks_suggested'] for m in found),'marks':found})
+    for series in interpretation['series']:
+     series['marker']='blob'
+     series['seeds']=[{'x':m['x'],'y':m['y']} for m in found]
+     if lone:
+      series['template_bbox']=lone['bbox']
+      series['legend_glyph']={'template_path':None,'width':lone['width'],'height':lone['height'],
+                              'ink_fraction':None,'mined_from_plot':True}
+    write_json(out/'interpretation.json',interpretation)
+    progress.emit('detected_marks',count=len(found),
+      marks_suggested=sum(m['marks_suggested'] for m in found),
+      crowded=sum(1 for m in found if m['crowded']),
+      reason='no legend glyphs; marks located by ink thickness, group attribution left open')
+   else:
+    progress.emit('detected_marks',count=0,marks_suggested=0,crowded=0,
+      reason='no legend glyphs and no marker-sized ink bodies in the plot')
   proposals=stage('proposals',lambda:geometry.analyze(out/'working.png',interpretation,out/'geometry'))
   # A proposal is only meaningful as a reading of the figure, so it is reported in
   # the figure's own units and against the group it was attributed to; the pixels

@@ -153,6 +153,115 @@ def extract_templates(image_path, plot_bbox, labels, outdir):
     return entries
 
 
+MIN_REPEATS = 4
+MAX_PLOT_MARKER_SIDE = 40
+CORE_RADIUS = 3
+MIN_CORE_AREA = 12
+
+
+def detect_marks(image_path, plot_bbox, radius=CORE_RADIUS):
+    """Find the plotted marks by thickness, without a legend and without a reader.
+
+    Curves, error bars and axes are thin; a plotted marker is a solid body. Eroding
+    the ink by a small disk therefore dissolves the lines and leaves one core per
+    marker, which works whatever shape each series uses and whatever the marker
+    touches. Cores far larger than the rest are overlapping markers printed on top
+    of one another: they are returned as crowded, with how many marks their area
+    suggests, because splitting them is not something the pixels settle alone.
+    """
+    gray = load_gray(image_path)
+    left, top, right, bottom = (int(round(v)) for v in plot_bbox)
+    inside = gray[max(0, top):bottom, max(0, left):right]
+    if inside.size == 0:
+        return []
+    disk = np.ones((2 * radius + 1, 2 * radius + 1), bool)
+    labelled, count = ndimage.label(ndimage.binary_erosion(inside < INK_LEVEL, disk))
+    if not count:
+        return []
+    cores = []
+    for index, (rows, columns) in enumerate(ndimage.find_objects(labelled), start=1):
+        area = int(np.count_nonzero(labelled[rows, columns] == index))
+        cores.append({'area': area, 'rows': rows, 'columns': columns})
+    # Eroding by the radius already removes anything thinner than the disk; what a
+    # thickened line or a dash leaves behind is a sliver of a few pixels, while a
+    # marker leaves a body, so the floor is absolute rather than relative to a
+    # figure whose bodies may all be stacks.
+    bodies = [c for c in cores if c['area'] >= MIN_CORE_AREA]
+    if not bodies:
+        return []
+    # One marker printed alone is the smallest body on the sheet; the median body
+    # in a crowded figure is already a stack, so it cannot set the unit.
+    unit = float(np.percentile([c['area'] for c in bodies], 20))
+    marks = []
+    for core in bodies:
+        rows, columns = core['rows'], core['columns']
+        box = [float(left + columns.start - radius), float(top + rows.start - radius),
+               float(left + columns.stop + radius), float(top + rows.stop + radius)]
+        width, height = box[2] - box[0], box[3] - box[1]
+        crowded = core['area'] > 1.8 * unit or max(width, height) > 1.8 * min(width, height)
+        marks.append({'x': (box[0] + box[2]) / 2, 'y': (box[1] + box[3]) / 2,
+                      'bbox': box, 'width': width, 'height': height,
+                      'core_area': core['area'], 'crowded': crowded,
+                      'marks_suggested': max(1, int(round(core['area'] / unit))) if crowded else 1})
+    marks.sort(key=lambda m: (m['x'], m['y']))
+    return marks
+
+
+def mine_from_plot(image_path, plot_bbox, outdir):
+    """Find the repeated mark the plot is drawn with, without asking anyone where it is.
+
+    A figure can label its groups in running text beside the curves and carry no
+    legend column at all, and a reader's guessed coordinates can be wrong
+    everywhere; the marks are still printed. Every isolated blob inside the plot
+    is measured, and the size that recurs most is taken as the marker: axes,
+    curves and text are long or unique, so they do not form a tight cluster of
+    equal-sized isolated blobs. It is weaker evidence than a legend glyph and is
+    recorded as mined.
+    """
+    gray = load_gray(image_path)
+    left, top, right, bottom = (int(round(v)) for v in plot_bbox)
+    inside = gray[max(0, top):bottom, max(0, left):right]
+    if inside.size == 0:
+        return None
+    labelled, count = ndimage.label(inside < INK_LEVEL)
+    if not count:
+        return None
+    blobs = []
+    for index, (rows, columns) in enumerate(ndimage.find_objects(labelled), start=1):
+        width, height = columns.stop - columns.start, rows.stop - rows.start
+        side = max(width, height)
+        if side < 4 or side > MAX_PLOT_MARKER_SIDE or min(width, height) < 3:
+            continue
+        if max(width, height) > 2.5 * min(width, height):
+            continue
+        patch = inside[rows, columns]
+        ink = float(np.count_nonzero((labelled[rows, columns] == index)) / patch.size)
+        if ink < .35:
+            continue
+        blobs.append({'box': [left + columns.start, top + rows.start,
+                              left + columns.stop, top + rows.stop],
+                      'side': side, 'ink_fraction': ink})
+    if len(blobs) < MIN_REPEATS:
+        return None
+    sides = np.array([b['side'] for b in blobs], dtype=float)
+    typical = float(np.median(sides))
+    # The marker is whatever size repeats; a blob of a one-off size is a stray.
+    repeated = [b for b in blobs if abs(b['side'] - typical) <= max(1., .25 * typical)]
+    if len(repeated) < MIN_REPEATS:
+        return None
+    pick = max(repeated, key=lambda b: b['ink_fraction'])
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    path = outdir / 'mined_template.png'
+    with Image.open(image_path) as source:
+        source.convert('RGB').crop(tuple(pick['box'])).save(path)
+    box = pick['box']
+    return {'template_bbox': [float(v) for v in box], 'template_path': str(path),
+            'width': box[2] - box[0], 'height': box[3] - box[1],
+            'ink_fraction': pick['ink_fraction'], 'mined_from_plot': True,
+            'repeats_found': len(repeated), 'typical_side': typical}
+
+
 MINED_WINDOW = 40
 
 

@@ -74,6 +74,7 @@ function panel(side) {
   const calls = $('span', null, ''); elapsed.append(clock, calls); root.append(elapsed);
   const blocks = {};
   for (const [key, title] of [['stages', 'stages'], ['legend', 'legend'], ['glyphs', 'legend glyphs (templates python searches for)'],
+       ['marks', 'marks measured out of the plot (no legend)'],
        ['candidates', 'candidates proposed'], ['screen', 'pixel screen'], ['judgment', 'judged by the other reader'],
        ['iteration', 'second pass'], ['overlay', 'annotated versions (newest first)'], ['result', 'result']]) {
     const b = $('div', 'block'); b.hidden = true; b.append($('b', null, title));
@@ -162,6 +163,16 @@ const render = {
       wrap.append(d);
     }
     show(p, 'glyphs', wrap);
+  },
+  detected_marks(p, e) {
+    // With no legend, Python locates the marks by ink thickness; a crowded body is
+    // several marks printed on top of one another and stays flagged as such.
+    const wrap = $('div');
+    wrap.append($('div', null, e.count
+      ? `${e.count} ink bodies · about ${e.marks_suggested} marks · ${e.crowded} crowded`
+      : 'none'));
+    wrap.append($('div', null, e.reason || ''));
+    show(p, 'marks', wrap);
   },
   candidates(p, e) {
     const t = $('table');

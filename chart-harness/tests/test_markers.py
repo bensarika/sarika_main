@@ -227,3 +227,53 @@ class NccMap(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ThicknessMarks(unittest.TestCase):
+    """A figure whose groups are named beside the curves has no glyph to copy."""
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+
+    def unlabelled(self, path, marks=MARKS, radius=7):
+        image = Image.new('RGB', (600, 400), 'white')
+        draw = ImageDraw.Draw(image)
+        draw.rectangle(PLOT, outline='black')
+        draw.line([(210, 340)] + list(marks) + [(550, 60)], fill='black', width=2)
+        draw.text((430, 260), '10 mg/kg', fill='black')
+        for x, y in marks:
+            draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill='black')
+        image.save(path)
+        return path
+
+    def test_marks_are_found_by_thickness_when_no_legend_exists(self):
+        found = markers.detect_marks(self.unlabelled(self.dir / 'plain.png'), PLOT)
+        self.assertEqual(len(MARKS), len(found))
+        for (x, y), mark in zip(MARKS, sorted(found, key=lambda m: m['x'])):
+            self.assertLess(abs(mark['x'] - x), 3)
+            self.assertLess(abs(mark['y'] - y), 3)
+            self.assertFalse(mark['crowded'])
+            self.assertEqual(1, mark['marks_suggested'])
+
+    def test_lines_axes_and_running_text_alone_are_not_marks(self):
+        image = Image.new('RGB', (600, 400), 'white')
+        draw = ImageDraw.Draw(image)
+        draw.rectangle(PLOT, outline='black')
+        draw.line([(210, 340), (550, 60)], fill='black', width=2)
+        draw.text((430, 260), '10 mg/kg', fill='black')
+        image.save(self.dir / 'bare.png')
+        self.assertEqual([], markers.detect_marks(self.dir / 'bare.png', PLOT))
+
+    def test_overlapping_marks_are_reported_as_one_crowded_body(self):
+        stacked = [(300, 200), (300, 208), (300, 216), (420, 150)]
+        found = markers.detect_marks(self.unlabelled(self.dir / 'stack.png', stacked), PLOT)
+        crowded = [m for m in found if m['crowded']]
+        self.assertEqual(1, len(crowded))
+        self.assertGreater(crowded[0]['marks_suggested'], 1)
+        self.assertLess(abs(crowded[0]['x'] - 300), 4)
+
+    def test_an_empty_plot_yields_nothing_rather_than_a_guess(self):
+        blank = Image.new('RGB', (600, 400), 'white')
+        blank.save(self.dir / 'blank.png')
+        self.assertEqual([], markers.detect_marks(self.dir / 'blank.png', PLOT))
+        self.assertEqual([], markers.detect_marks(self.dir / 'blank.png', [10., 10., 10., 10.]))
