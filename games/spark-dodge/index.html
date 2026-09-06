@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Spark Dodge</title>
+<link rel="icon" href="data:," />
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -65,8 +66,10 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys.delete(e.key));
 
 function pointerTo(clientX) {
+  if (over) return;
   const rect = canvas.getBoundingClientRect();
-  player.x = (clientX - rect.left) * (W / rect.width);
+  const x = (clientX - rect.left) * (W / rect.width);
+  player.x = Math.max(player.r, Math.min(W - player.r, x));
 }
 canvas.addEventListener('mousemove', e => pointerTo(e.clientX));
 canvas.addEventListener('touchmove', e => { pointerTo(e.touches[0].clientX); e.preventDefault(); }, { passive: false });
@@ -100,10 +103,6 @@ function update() {
   sparks = sparks.filter(s => s.y < H + 20);
   orbs = orbs.filter(o => o.y < H + 20);
 
-  for (const s of sparks) if (circlesHit(s, player)) {
-    over = true;
-    if (score > best) { best = score; localStorage.setItem('sparkDodgeBest', String(best)); bestEl.textContent = best; }
-  }
   orbs = orbs.filter(o => {
     if (circlesHit(o, player)) { score += 50; return false; }
     return true;
@@ -111,6 +110,11 @@ function update() {
 
   score++;
   scoreEl.textContent = score;
+
+  if (sparks.some(s => circlesHit(s, player))) {
+    over = true;
+    if (score > best) { best = score; localStorage.setItem('sparkDodgeBest', String(best)); bestEl.textContent = best; }
+  }
 }
 
 function draw() {
