@@ -6,7 +6,16 @@
 <title>SARIKA PONG</title>
 <link rel="icon" href="data:," />
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: dark;
+    --maroon: #3e0606;
+    --maroon-deep: #240303;
+    --maroon-light: #5c1414;
+    --cream: #f7edea;
+    --igg: #f2c14e;
+    --igg-alt: #7fc8b0;
+    --denatured: #e05a5a;
+  }
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -15,12 +24,15 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
-    background: radial-gradient(circle at 50% 20%, #1b2735, #090a0f 70%);
-    color: #e8ecf1;
+    gap: 14px;
+    padding: 16px 0;
+    background: radial-gradient(circle at 50% 12%, #5a0d0d, var(--maroon-deep) 72%);
+    color: var(--cream);
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   }
-  h1 { margin: 0; font-size: 26px; letter-spacing: 2px; font-weight: 600; }
+  header { display: flex; align-items: center; gap: 12px; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: 3px; font-weight: 600; }
+  #logo { width: 38px; height: 38px; flex: none; }
   #hud {
     display: flex;
     flex-wrap: wrap;
@@ -33,17 +45,17 @@
   }
   #who { max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; display: inline-block; }
   canvas {
-    background: #0d1117;
-    border: 1px solid #2b3442;
+    background: #1c0303;
+    border: 1px solid var(--maroon-light);
     border-radius: 12px;
     touch-action: none;
     max-width: 96vw;
     height: auto;
   }
-  #hint { font-size: 13px; opacity: .6; }
+  #hint { font-size: 13px; opacity: .6; max-width: 96vw; text-align: center; }
   #name {
-    background: #0d1117;
-    border: 1px solid #2b3442;
+    background: #1c0303;
+    border: 1px solid var(--maroon-light);
     border-radius: 8px;
     color: inherit;
     font: inherit;
@@ -52,15 +64,27 @@
     width: 220px;
     max-width: 60vw;
   }
-  #name:focus { outline: none; border-color: #7fd1ff; }
+  #name:focus { outline: none; border-color: var(--igg); }
 </style>
 </head>
 <body>
-  <h1>SARIKA PONG</h1>
+  <header>
+    <svg id="logo" viewBox="-50 -50 100 100" fill="none" stroke="currentColor" stroke-width="4" aria-hidden="true">
+      <g id="petals">
+        <ellipse cx="0" cy="-24" rx="10" ry="24" />
+        <ellipse cx="0" cy="-24" rx="10" ry="24" transform="rotate(60)" />
+        <ellipse cx="0" cy="-24" rx="10" ry="24" transform="rotate(120)" />
+        <ellipse cx="0" cy="-24" rx="10" ry="24" transform="rotate(180)" />
+        <ellipse cx="0" cy="-24" rx="10" ry="24" transform="rotate(240)" />
+        <ellipse cx="0" cy="-24" rx="10" ry="24" transform="rotate(300)" />
+      </g>
+    </svg>
+    <h1>SARIKA PONG</h1>
+  </header>
   <input id="name" type="text" maxlength="16" placeholder="Enter your name" autocomplete="off" />
   <div id="hud"><span>Player: <b id="who">Guest</b></span><span>Score: <b id="score">0</b></span><span>Best: <b id="best">0</b></span></div>
   <canvas id="game" width="480" height="640"></canvas>
-  <div id="hint">Move with the mouse, touch, or arrow keys. Dodge the red sparks, collect the green orbs.</div>
+  <div id="hint">Move the FcRn receptor with the mouse, touch, or arrow keys. Catch the gold and teal IgG antibodies, avoid the red denatured ones.</div>
 
 <script>
 const canvas = document.getElementById('game');
@@ -70,6 +94,11 @@ const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
 const nameEl = document.getElementById('name');
 const whoEl = document.getElementById('who');
+
+const CREAM = '#f7edea';
+const MEMBRANE_TOP = H - 74;
+const IGG_COLORS = ['#f2c14e', '#7fc8b0'];
+const DENATURED = '#e05a5a';
 
 let best = Number(localStorage.getItem('sparkDodgeBest') || 0);
 bestEl.textContent = best;
@@ -87,12 +116,13 @@ nameEl.addEventListener('keydown', e => {
   if (e.key === 'Enter') nameEl.blur();
 });
 
-const player = { x: W / 2, y: H - 60, r: 12, vx: 0 };
-let sparks = [], orbs = [], score = 0, tick = 0, over = false;
+// The receptor is a cradle between two poles anchored in the membrane.
+const player = { x: W / 2, y: MEMBRANE_TOP - 46, r: 26, vx: 0 };
+let bad = [], good = [], score = 0, tick = 0, over = false;
 const keys = new Set();
 
 function reset() {
-  sparks = []; orbs = []; score = 0; tick = 0; over = false;
+  bad = []; good = []; score = 0; tick = 0; over = false;
   player.x = W / 2; player.vx = 0;
 }
 
@@ -116,19 +146,36 @@ canvas.addEventListener('mousemove', e => pointerTo(e.clientX));
 canvas.addEventListener('touchmove', e => { pointerTo(e.touches[0].clientX); e.preventDefault(); }, { passive: false });
 canvas.addEventListener('click', () => { if (over) reset(); });
 
+function antibody(color) {
+  return {
+    x: 24 + Math.random() * (W - 48),
+    y: -28,
+    r: 19,
+    vy: 0,
+    rot: (Math.random() - 0.5) * 0.6,
+    vr: (Math.random() - 0.5) * 0.04,
+    color
+  };
+}
+
 function spawn() {
   const difficulty = 1 + score / 400;
   if (tick % Math.max(9, Math.round(26 / difficulty)) === 0) {
-    sparks.push({ x: Math.random() * W, y: -10, r: 6 + Math.random() * 5, vy: 2 + Math.random() * 2 * difficulty });
+    const a = antibody(DENATURED);
+    a.vy = 2 + Math.random() * 2 * difficulty;
+    bad.push(a);
   }
   if (tick % 90 === 0) {
-    orbs.push({ x: 20 + Math.random() * (W - 40), y: -10, r: 8, vy: 2.2 });
+    const a = antibody(IGG_COLORS[Math.floor(Math.random() * IGG_COLORS.length)]);
+    a.vy = 2.2;
+    good.push(a);
   }
 }
 
-function circlesHit(a, b) {
-  const dx = a.x - b.x, dy = a.y - b.y;
-  return Math.hypot(dx, dy) < a.r + b.r;
+// Caught when the antibody overlaps the receptor cradle.
+function caught(a) {
+  const dx = Math.abs(a.x - player.x), dy = Math.abs(a.y - player.y);
+  return dx < player.r + a.r * 0.5 && dy < 22 + a.r * 0.5;
 }
 
 function update() {
@@ -139,51 +186,108 @@ function update() {
   player.x = Math.max(player.r, Math.min(W - player.r, player.x + player.vx));
 
   spawn();
-  for (const s of sparks) s.y += s.vy;
-  for (const o of orbs) o.y += o.vy;
-  sparks = sparks.filter(s => s.y < H + 20);
-  orbs = orbs.filter(o => o.y < H + 20);
+  for (const a of bad.concat(good)) { a.y += a.vy; a.rot += a.vr; }
+  bad = bad.filter(a => a.y < H + 30);
+  good = good.filter(a => a.y < H + 30);
 
-  orbs = orbs.filter(o => {
-    if (circlesHit(o, player)) { score += 50; return false; }
+  good = good.filter(a => {
+    if (caught(a)) { score += 50; return false; }
     return true;
   });
 
   score++;
   scoreEl.textContent = score;
 
-  if (sparks.some(s => circlesHit(s, player))) {
+  if (bad.some(caught)) {
     over = true;
     if (score > best) { best = score; localStorage.setItem('sparkDodgeBest', String(best)); bestEl.textContent = best; }
   }
 }
 
+function drawAntibody(a) {
+  ctx.save();
+  ctx.translate(a.x, a.y);
+  ctx.rotate(a.rot);
+  ctx.scale(a.r / 19, a.r / 19);
+  ctx.strokeStyle = a.color;
+  ctx.lineWidth = 4.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.beginPath();
+  // Heavy chains: V arms meeting the split stem.
+  ctx.moveTo(-14, -18); ctx.lineTo(-4, -8); ctx.lineTo(-4, 18);
+  ctx.moveTo(14, -18); ctx.lineTo(4, -8); ctx.lineTo(4, 18);
+  // Hinge bar between the two stem strands.
+  ctx.moveTo(-4, -2); ctx.lineTo(4, -2);
+  // Light chains: outer prongs parallel to each arm.
+  ctx.moveTo(-19, -13); ctx.lineTo(-10, -4);
+  ctx.moveTo(19, -13); ctx.lineTo(10, -4);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawMembrane() {
+  const grad = ctx.createLinearGradient(0, MEMBRANE_TOP, 0, H);
+  grad.addColorStop(0, '#5c1414');
+  grad.addColorStop(1, '#3e0606');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, MEMBRANE_TOP, W, H - MEMBRANE_TOP);
+
+  // Phospholipid bilayer: two rows of heads with tails facing inward.
+  ctx.strokeStyle = 'rgba(247,237,234,0.28)';
+  ctx.lineWidth = 2;
+  for (let x = 10; x < W; x += 20) {
+    for (const [headY, dir] of [[MEMBRANE_TOP + 9, 1], [H - 9, -1]]) {
+      ctx.beginPath();
+      ctx.arc(x, headY, 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, headY + 5 * dir);
+      ctx.lineTo(x, headY + 20 * dir);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawReceptor() {
+  const x = player.x, top = player.y;
+  ctx.strokeStyle = CREAM;
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Two transmembrane poles anchored through the bilayer.
+  ctx.beginPath();
+  ctx.moveTo(x - 14, top + 10); ctx.lineTo(x - 14, H - 14);
+  ctx.moveTo(x + 14, top + 10); ctx.lineTo(x + 14, H - 14);
+  ctx.stroke();
+
+  // Binding cradle that catches the antibodies.
+  ctx.strokeStyle = '#f2c14e';
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.moveTo(x - 26, top - 12);
+  ctx.quadraticCurveTo(x, top + 18, x + 26, top - 12);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(247,237,234,0.8)';
+  ctx.font = '600 11px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('FcRn receptor', x, top - 20);
+}
+
 function draw() {
   ctx.clearRect(0, 0, W, H);
-
-  ctx.fillStyle = '#7fd1ff';
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#ff5c5c';
-  for (const s of sparks) {
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.fillStyle = '#5cffb1';
-  for (const o of orbs) {
-    ctx.beginPath();
-    ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  drawMembrane();
+  drawReceptor();
+  for (const a of bad) drawAntibody(a);
+  for (const a of good) drawAntibody(a);
 
   if (over) {
-    ctx.fillStyle = 'rgba(9,10,15,0.78)';
+    ctx.fillStyle = 'rgba(36,3,3,0.85)';
     ctx.fillRect(0, H / 2 - 70, W, 140);
-    ctx.fillStyle = '#e8ecf1';
+    ctx.fillStyle = CREAM;
     ctx.textAlign = 'center';
     ctx.font = '600 30px system-ui, sans-serif';
     ctx.fillText('GAME OVER', W / 2, H / 2 - 14);

@@ -2,6 +2,11 @@
 
 Single-page canvas game. No build step or dependencies — `index.html` is the whole app.
 
+Sarika-branded: maroon/cream palette and the six-petal mark from sarika.com (inlined as SVG), IgG
+antibodies drawn as canvas paths, and an FcRn receptor catcher anchored through a phospholipid
+bilayer on two transmembrane poles. Catch the gold and teal IgG antibodies, avoid the red
+denatured ones.
+
 Run locally:
 
 ```bash
