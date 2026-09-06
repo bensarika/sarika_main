@@ -72,7 +72,10 @@ nameEl.addEventListener('input', () => {
   whoEl.textContent = playerName || 'Guest';
   localStorage.setItem('sparkPongName', playerName);
 });
-nameEl.addEventListener('keydown', e => { if (e.key === 'Enter') nameEl.blur(); });
+nameEl.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter') nameEl.blur();
+});
 
 const player = { x: W / 2, y: H - 60, r: 12, vx: 0 };
 let sparks = [], orbs = [], score = 0, tick = 0, over = false;
