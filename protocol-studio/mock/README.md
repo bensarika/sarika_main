@@ -103,6 +103,13 @@ Second round (user walkthrough feedback):
 14. **The lower-left avatar opens an account menu** (my works, permissions,
     administration, preferences, shortcuts, sign out); the same menu is
     reachable from the top bar.
+15. **No icon-only navigation.** The 56px icon rail was rejected ("I don't
+    like the image only"). Every screen now has a 232px labelled sidebar:
+    brand, four primary destinations as icon + label, and the active one
+    expanded into its second-level pages in words (Workspace lists open
+    works with status dot and %). It collapses to icons only on an explicit
+    « Collapse click. The account block at the bottom shows name, email and
+    role. Editor panes were rebalanced to 300 / canvas / 380 to make room.
 
 ## Not in the mock
 

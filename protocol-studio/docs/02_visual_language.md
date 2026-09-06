@@ -103,10 +103,17 @@ typed by the author (M11 forbids editing L1/L2 headings).
 
 ## 4. Layout
 
-**App frame:** 56-px left icon rail (Workspace, Library, Calculator, Admin;
-avatar bottom-left opens the account menu) → a **persistent horizontal app
-bar** (44 px, slate-800) on every screen: brand, the same four destinations
-as uppercase tabs, global search, environment/revision, account. Screens
+**App frame:** 232-px left **labelled sidebar** (slate-950) on every screen
+except login: brand row, four primary destinations as icon + uppercase label
+(WORKSPACE, LIBRARY, TRIAL CALCULATOR, ADMIN), and under the active one its
+second-level pages spelled out in words (e.g. Workspace → My works, New from
+starter, then the user's open works with status dot and completion %). Icons
+are never the only cue; the sidebar collapses to a 56-px icon rail only when
+the user clicks « Collapse. The bottom holds a Collapse control and the
+account block (avatar, name, email · role) that opens the account menu. To
+its right, a **persistent horizontal app bar** (44 px, slate-800): the same
+four destinations as uppercase tabs, global search, environment/revision,
+account. Screens
 that are not the editor add a 48-px white bar under it for breadcrumb and
 screen actions.
 
@@ -122,8 +129,8 @@ style, B/I/U, lists, table, Comment, Ask model, mode, Analysis, Findings).
 Below that, three panes:
 ```
 ┌──────┬────────────────────────────┬────────────────────────────────┬──────────────┐
-│ rail │ SIDEBAR (340)                │ CANVAS (paper, max 860)        │ INSPECTOR    │
-│      │ OUTLINE · WORKFLOW · ANALYSIS│  3 TRIAL OBJECTIVES AND …      │ (400)        │
+│ side │ SIDEBAR (300)                │ CANVAS (paper, max 860)        │ INSPECTOR    │
+│ bar  │ OUTLINE · WORKFLOW · ANALYSIS│  3 TRIAL OBJECTIVES AND …      │ (380)        │
 │      │ 0 Identity & control  100%   │  3.1 Primary Objective(s) …    │ INSPECT      │
 │      │ 3 Questions & outc.  90% ●●  │  ┃ To evaluate the efficacy of │ FINDINGS · 8 │
 │      │   └ 1 blocking · 1 warning … │  ┃ <DRUG> vs placebo …         │ ASK          │

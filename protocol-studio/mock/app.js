@@ -35,15 +35,36 @@ const ICONS = {
   calc: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h3M13 12h3M8 16h3M13 16h3"/></svg>',
   admin: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>',
 };
-const NAV = [['works', '/library', 'Workspace'], ['library', '/library/studies', 'Library'], ['calc', '/calculator', 'Trial calculator'], ['admin', '/admin/users', 'Admin']];
+/* Primary navigation: [key, landing route, label, sub-links]. Sub-links are the labelled
+   second level shown in the sidebar; `work:` prefix expands to the user's open works. */
+const NAV = [
+  ['works', '/library', 'Workspace', [['My works', '/library'], ['New from starter', '/new/1'], 'work:']],
+  ['library', '/library/studies', 'Library', [['Study library', '/library/studies'], ['Master sheet · AD', '/library/master'], ['Conversion templates', '/library/templates']]],
+  ['calc', '/calculator', 'Trial calculator', [['Sample size & history', '/calculator'], ['Endpoint explorer', null, 'Pilot 4b'], ['Criteria comparator', '/editor/W-102', null, "state.itab='compare';render()"]]],
+  ['admin', '/admin/users', 'Admin', [['Users', '/admin/users'], ['Works & permissions', '/admin/works'], ['Usage', '/admin/usage'], ['Models & providers', '/admin/models'], ['Audit log', '/admin/audit']]],
+];
+/* Left sidebar: always labelled. Collapses to icons only when the user asks (« button). */
 function rail(active) {
-  const item = ([k, path, title]) => h`<a href="#${path}" class="${active === k ? 'active' : ''}" title="${title}">${ICONS[k]}</a>`;
-  return h`<nav class="rail"><div class="logo">P</div>${NAV.map(item).join('')}
-    <div class="spacer"></div><div class="avatar ${state.userMenu ? 'open' : ''}" title="Ben Altman · admin" onclick="event.stopPropagation();state.userMenu=!state.userMenu;render()">BA</div></nav>${state.userMenu ? userMenu() : ''}`;
+  const route = state.route;
+  const sub = ([label, path, soon, pre]) => {
+    if (!path) return h`<a class="sub soon" onclick="toast('${label}: planned for ${soon} (mock)')">${label}<span class="k">${soon}</span></a>`;
+    return h`<a class="sub ${route === path && !pre ? 'active' : ''}" href="#${path}" ${pre ? h`onclick="${pre}"` : ''}>${label}</a>`;
+  };
+  const works = () => WORKS.map((w) => h`<a class="sub work ${route === '/editor/' + w.id ? 'active' : ''}" href="#/editor/${w.id}" title="${w.title}"><span class="dot ${w.blocking ? 'err' : 'ok'}"></span><span class="t">${w.title.split(' · ')[0]} · ${w.kind}</span><span class="k">${w.pct}%</span></a>`).join('');
+  const group = ([k, path, title, subs]) => h`<div class="group ${active === k ? 'active' : ''}">
+    <a class="top" href="#${path}" title="${title}">${ICONS[k]}<span class="label">${title}</span></a>
+    ${active === k ? h`<div class="subs">${subs.map((s) => (s === 'work:' ? works() : sub(s))).join('')}</div>` : ''}</div>`;
+  return h`<nav class="rail ${state.railCollapsed ? 'collapsed' : ''}">
+    <a class="brandrow" href="#/library"><span class="logo">P</span><span class="label">Protocol Studio</span></a>
+    ${NAV.map(group).join('')}
+    <div class="spacer"></div>
+    <a class="collapse" onclick="state.railCollapsed=!state.railCollapsed;render()" title="${state.railCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}">${state.railCollapsed ? '»' : '«'}<span class="label">Collapse</span></a>
+    <div class="me ${state.userMenu ? 'open' : ''}" title="Account" onclick="event.stopPropagation();state.userMenu=!state.userMenu;render()"><span class="avatar">BA</span><span class="label"><b>Ben Altman</b><small>ben@sarika.com · admin</small></span><span class="caret">▴</span></div>
+  </nav>${state.userMenu ? userMenu() : ''}`;
 }
 /* Persistent horizontal bar: the same on every screen (Google-Docs-style app header). */
 function topnav(active) {
-  return h`<header class="topnav"><span class="brand">Protocol Studio</span>
+  return h`<header class="topnav">
     ${NAV.map(([k, path, title]) => h`<a class="nav ${active === k ? 'active' : ''}" href="#${path}">${title}</a>`).join('')}
     <div class="grow"></div><input class="search" placeholder="Search works, studies, criteria…  ( / )" onkeydown="if(event.key==='Enter')toast('Search: '+this.value+' (mock)')">
     <span class="env">rev 42 · eu-west-1</span>
