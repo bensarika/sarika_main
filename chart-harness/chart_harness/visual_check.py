@@ -43,7 +43,7 @@ def render(source,points,annotations,path,title):
 
 class VisualCheckProvider:
  """Wrap every image-bearing model call. No opt-out or alternate annotator model."""
- def __init__(self,provider,out):self.provider=provider;self.out=Path(out)
+ def __init__(self,provider,out,strict=True):self.provider=provider;self.out=Path(out);self.strict=strict
  def complete(self,stage,prompt,images=(),schema=None):
   result=self.provider.complete(stage,prompt,images,schema)
   return self.check(stage,result,images,prompt)
@@ -77,4 +77,10 @@ class VisualCheckProvider:
    return result
   except Exception as exc:
    (self.out/(stage+'.failure.json')).write_text(json.dumps({'status':'incomplete','error_type':type(exc).__name__,'model_authored_visual_check':False}))
-   raise
+   if self.strict:raise
+   # Oversight that cannot be produced is a concern about the stage, not a
+   # reason to discard measurements the stage already made.
+   result['_visual_check']={'status':'unavailable','assessment':'concerns',
+    'error_type':type(exc).__name__,'error':str(exc)[:400],'annotations':[],
+    'notes':['visual check unavailable; stage output is unverified'],'same_provider':True}
+   return result

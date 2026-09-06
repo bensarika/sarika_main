@@ -26,6 +26,17 @@ class VisualTests(unittest.TestCase):
      return {'annotations':[],'assessment':'consistent'} if stage.endswith('visual_check') else {'series':[{'id':'s','seeds':[{'x':50,'y':40}]}]}
    with self.assertRaises(VisualCheckError):VisualCheckProvider(Stub(),root).complete('interpret','read',[im])
    self.assertTrue((root/'interpret.primary.json').exists());self.assertTrue((root/'interpret.failure.json').exists())
+ def test_unstrict_check_keeps_the_stage_but_records_a_concern(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   root=Path(tmp);im=root/'input.png';Image.new('RGB',(100,80),'white').save(im)
+   class Stub:
+    def complete(self,stage,*args):
+     return {'annotations':[],'assessment':'consistent'} if stage.endswith('visual_check') else {'series':[{'id':'s','seeds':[{'x':50,'y':40}]}]}
+   result=VisualCheckProvider(Stub(),root,strict=False).complete('interpret','read',[im])
+   self.assertEqual(result['_visual_check']['assessment'],'concerns')
+   self.assertEqual(result['_visual_check']['status'],'unavailable')
+   self.assertEqual(result['series'][0]['seeds'],[{'x':50,'y':40}])
+   self.assertTrue((root/'interpret.failure.json').exists())
  def test_independent_center_disagreement_and_missing_center(self):
   proposals={'candidates':[{'candidate_id':'p','pixel':{'x':300.46,'y':513.10}}]}
   for center in [None,{'x':318.04,'y':538.10}]:

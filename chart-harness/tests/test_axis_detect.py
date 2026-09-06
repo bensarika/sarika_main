@@ -93,6 +93,19 @@ class AxisDetectTests(unittest.TestCase):
         for image in images[1:]:
             self.assertTrue(image.exists())
 
+    def test_plot_bbox_comes_from_measured_rules_and_outer_ticks(self):
+        detected = axis_detect.detect_ticks(self.path)
+        box = axis_detect.plot_bbox_from_ticks(detected)
+        self.assertEqual(box[0], float(detected['y_axis_col']))
+        self.assertEqual(box[3], float(detected['x_axis_row']))
+        self.assertEqual(box[2], max(detected['x_tick_pixels']))
+        self.assertEqual(box[1], min(detected['y_tick_pixels']))
+
+    def test_plot_bbox_needs_both_measured_rules(self):
+        self.assertIsNone(axis_detect.plot_bbox_from_ticks(
+            {'y_axis_col': 10, 'x_axis_row': None,
+             'x_tick_pixels': [20., 30.], 'y_tick_pixels': [5., 8.]}))
+
     def test_review_anchors_take_measured_pixels_from_named_tick_indices(self):
         detected = {'x_tick_pixels': [100., 200., 300.], 'y_tick_pixels': [10., 60.]}
         review = {'x_axis': {'scale': 'linear',

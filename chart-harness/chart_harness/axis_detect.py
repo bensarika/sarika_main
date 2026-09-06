@@ -117,6 +117,26 @@ def clamp_plot_bbox(bbox, detected):
     return clamped, clamped != [float(v) for v in bbox]
 
 
+def plot_bbox_from_ticks(detected):
+    """Build the plot box from measured axis rules and outermost ticks.
+
+    A reader shown a downscaled rendering returns a box in that frame, which is
+    a scaled version of the truth and therefore invisible to any self-consistency
+    check. Where both rules and their ticks were measured, the box is geometry,
+    not interpretation.
+    """
+    col, row = detected.get('y_axis_col'), detected.get('x_axis_row')
+    x_ticks = detected.get('x_tick_pixels') or []
+    y_ticks = detected.get('y_tick_pixels') or []
+    if col is None or row is None or len(x_ticks) < 2 or len(y_ticks) < 2:
+        return None
+    right = max(max(x_ticks), float(col))
+    top = min(min(y_ticks), float(row))
+    if right <= col or top >= row:
+        return None
+    return [float(col), float(top), float(right), float(row)]
+
+
 def repair_packet(image_path, detected, outdir):
     """Prompt and images asking a reader to name the values of detected ticks.
 

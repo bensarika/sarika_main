@@ -29,7 +29,8 @@ def write_json(path,data):
  tmp.write_text(json.dumps(data,indent=2,allow_nan=False));tmp.replace(path)
 
 def make_provider(config,out,role):
- return VisualCheckProvider(_make_provider(config,out,role),out/"visual_checks"/role)
+ return VisualCheckProvider(_make_provider(config,out,role),out/"visual_checks"/role,
+   strict=config.get('visual_check_strict',True))
 
 def _make_provider(config,out,role):
  c=dict(config.get(role,config['model']))
@@ -176,10 +177,21 @@ def run(args):
       check['repaired_axes']=sorted(applied)
       write_json(out/'interpretation.json',interpretation)
    if not check['inconclusive'] and config.get('clamp_plot_bbox_to_axes',True):
-    clamped,changed=axis_detect.clamp_plot_bbox(interpretation['plot_bbox'],check['detected'])
+    measured=axis_detect.plot_bbox_from_ticks(check['detected']) if config.get('plot_bbox_from_ticks',True) else None
+    clamped,changed=(measured,measured!=[float(v) for v in interpretation['plot_bbox']]) if measured else \
+      axis_detect.clamp_plot_bbox(interpretation['plot_bbox'],check['detected'])
     if changed:
      check['plot_bbox_clamped_from']=interpretation['plot_bbox']
+     check['plot_bbox_source']='measured_axes' if measured else 'clamped_model_box'
      interpretation['plot_bbox']=clamped
+     # Seeds read off a differently scaled rendering land outside the measured
+     # plot; template matching searches the plot instead of chasing them.
+     left,top,right,bottom=clamped
+     for series in interpretation.get('series',[]):
+      seeds=[s for s in series.get('seeds',[]) if left<=s['x']<=right and top<=s['y']<=bottom]
+      if seeds!=series.get('seeds',[]):
+       check.setdefault('seeds_dropped_outside_plot',{})[series['id']]=len(series.get('seeds',[]))-len(seeds)
+       series['seeds']=seeds
      write_json(out/'interpretation.json',interpretation)
    interpretation['axis_tick_check']=check
    write_json(out/'axis_tick_check.json',check)
