@@ -6,6 +6,8 @@ for a differently scaled rendering, still produces a perfectly linear fit. The
 detector below measures axis lines and tick marks from the original pixels so
 that such globally shifted calibrations become visible.
 """
+import itertools
+import math
 from pathlib import Path
 
 import numpy as np
@@ -159,6 +161,113 @@ Read the digits that are printed, not a conventional or expected sampling schedu
 A log axis must be reported as log with the printed decade values, never relabelled.
 If the labels are unreadable, status must be unresolved. Do not guess or run code.'''
     return prompt, [Path(image_path)] + [path for path, _, _ in images]
+
+
+INDEX_SEARCH = 3
+FIT_TOLERANCE_PX = 1.
+
+
+def _fit_residual(anchors, scale):
+    """Worst pixel residual of a straight line through (value, pixel) anchors."""
+    values = []
+    for anchor in anchors:
+        value = float(anchor['value'])
+        if scale == 'log':
+            if value <= 0:
+                return None
+            value = math.log10(value)
+        values.append(value)
+    pixels = [float(a['pixel']) for a in anchors]
+    if len(set(values)) < 2:
+        return None
+    slope, intercept = np.polyfit(values, pixels, 1)
+    return max(abs(slope * v + intercept - p) for v, p in zip(values, pixels))
+
+
+def _refit_indices(anchors, ticks, scale, span):
+    """Search near the reader's tick indices for a collinear assignment.
+
+    Readers miscount long tick lists by an index or two, which is a large pixel
+    error but a small combinatorial one, so the printed values stay usable when
+    exactly one nearby assignment is straight. Equally straight assignments are
+    settled by staying closest to what the reader actually named.
+    """
+    best = None
+    for offsets in itertools.product(range(-span, span + 1), repeat=len(anchors)):
+        picked = []
+        for anchor, offset in zip(anchors, offsets):
+            index = anchor['index'] + offset
+            if not 0 <= index < len(ticks):
+                break
+            picked.append({'pixel': ticks[index], 'value': anchor['value']})
+        else:
+            if len({p['pixel'] for p in picked}) < len(picked):
+                continue
+            residual = _fit_residual(picked, scale)
+            if residual is None:
+                continue
+            key = (round(residual, 6), sum(abs(o) for o in offsets))
+            if best is None or key < best[0]:
+                best = (key, picked)
+    if best is None or best[0][0] > FIT_TOLERANCE_PX:
+        return None
+    return best[1]
+
+
+def resolve_tick_indices(axis_check, detected, tolerance_px):
+    """Turn reviewer anchors that name measured ticks into measured pixels.
+
+    A reader reports coordinates in whatever rendering it was shown, so its raw
+    pixels can be uniformly scaled away from the source. Naming a tick by index
+    keeps the reader's contribution (the printed value) and Python's (the
+    position); a reader that still returns a pixel is snapped only if it already
+    lands on a measured tick.
+    """
+    resolved = {}
+    dropped = []
+    for name in ('x_axis', 'y_axis'):
+        axis = axis_check.get(name)
+        ticks = detected.get('x_tick_pixels' if name == 'x_axis' else 'y_tick_pixels') or []
+        if not isinstance(axis, dict):
+            continue
+        resolved[name] = axis
+        if not ticks:
+            continue
+        anchors = []
+        named = []
+        for anchor in axis.get('anchors', []):
+            index, pixel, value = anchor.get('tick_index'), anchor.get('pixel'), anchor.get('value')
+            if not isinstance(value, (int, float)):
+                continue
+            if isinstance(index, int) and 0 <= index < len(ticks):
+                anchors.append({'pixel': ticks[index], 'value': value})
+                named.append({'index': index, 'value': value})
+                continue
+            if isinstance(pixel, (int, float)):
+                nearest = min(ticks, key=lambda t: abs(t - pixel))
+                if abs(nearest - pixel) <= tolerance_px:
+                    anchors.append({'pixel': nearest, 'value': value})
+                    continue
+                dropped.append({'axis': name, 'pixel': float(pixel), 'value': value,
+                                'nearest_tick_pixel': nearest})
+            else:
+                dropped.append({'axis': name, 'tick_index': index, 'value': value})
+        if len(named) == len(anchors) >= 2:
+            residual = _fit_residual(anchors, axis.get('scale'))
+            if residual is None or residual > FIT_TOLERANCE_PX:
+                refit = _refit_indices(named, ticks, axis.get('scale'), INDEX_SEARCH)
+                if refit is None:
+                    dropped.append({'axis': name, 'reason': 'named ticks do not fit the stated scale',
+                                    'anchors': anchors})
+                    continue
+                if refit != anchors:
+                    dropped.append({'axis': name, 'reason': 'reader tick indices refitted',
+                                    'from': anchors, 'to': refit})
+                anchors = refit
+        unique = {a['pixel']: a for a in anchors}
+        if len(unique) >= 2:
+            resolved[name] = {**axis, 'anchors': sorted(unique.values(), key=lambda a: a['pixel'])}
+    return {**axis_check, **resolved}, dropped
 
 
 def apply_repair(interpretation, repaired, detected, tolerance_px):

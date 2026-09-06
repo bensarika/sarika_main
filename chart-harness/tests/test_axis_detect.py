@@ -93,6 +93,55 @@ class AxisDetectTests(unittest.TestCase):
         for image in images[1:]:
             self.assertTrue(image.exists())
 
+    def test_review_anchors_take_measured_pixels_from_named_tick_indices(self):
+        detected = {'x_tick_pixels': [100., 200., 300.], 'y_tick_pixels': [10., 60.]}
+        review = {'x_axis': {'scale': 'linear',
+                             'anchors': [{'tick_index': 0, 'value': 0},
+                                         {'tick_index': 2, 'value': 800}]}}
+        resolved, dropped = axis_detect.resolve_tick_indices(review, detected, 6.)
+        self.assertEqual(resolved['x_axis']['anchors'],
+                         [{'pixel': 100., 'value': 0}, {'pixel': 300., 'value': 800}])
+        self.assertEqual(dropped, [])
+
+    def test_miscounted_tick_indices_are_refitted_to_a_straight_calibration(self):
+        detected = {'x_tick_pixels': [50., 100., 200., 300., 400.], 'y_tick_pixels': []}
+        review = {'x_axis': {'scale': 'linear',
+                             'anchors': [{'tick_index': 0, 'value': 0},
+                                         {'tick_index': 2, 'value': 200},
+                                         {'tick_index': 4, 'value': 600}]}}
+        resolved, dropped = axis_detect.resolve_tick_indices(review, detected, 6.)
+        self.assertEqual([a['pixel'] for a in resolved['x_axis']['anchors']], [100., 200., 400.])
+        self.assertEqual([d['reason'] for d in dropped], ['reader tick indices refitted'])
+
+    def test_named_ticks_that_fit_no_straight_calibration_are_dropped(self):
+        detected = {'x_tick_pixels': [0., 5., 11., 400.], 'y_tick_pixels': []}
+        review = {'x_axis': {'scale': 'linear',
+                             'anchors': [{'tick_index': 0, 'value': 0},
+                                         {'tick_index': 1, 'value': 200},
+                                         {'tick_index': 2, 'value': 800}]}}
+        resolved, dropped = axis_detect.resolve_tick_indices(review, detected, 6.)
+        self.assertEqual(resolved['x_axis']['anchors'],
+                         [{'tick_index': 0, 'value': 0}, {'tick_index': 1, 'value': 200},
+                          {'tick_index': 2, 'value': 800}])
+        self.assertEqual([d['reason'] for d in dropped],
+                         ['named ticks do not fit the stated scale'])
+
+    def test_review_anchors_in_a_foreign_pixel_frame_are_dropped(self):
+        detected = {'x_tick_pixels': [100., 200., 300.], 'y_tick_pixels': []}
+        review = {'x_axis': {'anchors': [{'pixel': 55, 'value': 0}, {'pixel': 165, 'value': 800}]}}
+        resolved, dropped = axis_detect.resolve_tick_indices(review, detected, 6.)
+        self.assertEqual(resolved['x_axis']['anchors'],
+                         [{'pixel': 55, 'value': 0}, {'pixel': 165, 'value': 800}])
+        self.assertEqual([d['value'] for d in dropped], [0, 800])
+
+    def test_review_anchors_already_on_measured_ticks_snap(self):
+        detected = {'x_tick_pixels': [100., 200., 300.], 'y_tick_pixels': []}
+        review = {'x_axis': {'anchors': [{'pixel': 101, 'value': 0}, {'pixel': 299, 'value': 800}]}}
+        resolved, dropped = axis_detect.resolve_tick_indices(review, detected, 6.)
+        self.assertEqual(resolved['x_axis']['anchors'],
+                         [{'pixel': 100., 'value': 0}, {'pixel': 300., 'value': 800}])
+        self.assertEqual(dropped, [])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,7 +1,7 @@
 """Short, versioned contracts. No document-sized conversational history."""
 import json
 
-VERSION = 'batched-crop-review-1'
+VERSION = 'batched-crop-review-2'
 INTERPRET_SCHEMA = {
  'type':'object','required':['plot_bbox','x_axis','y_axis','series'],
  'properties':{
@@ -66,8 +66,21 @@ REVIEW_BATCH_SCHEMA = {'type':'object','required':['decisions','status'],
  'missing_points':{'type':'array'},'notes':{'type':'array'}},
  'additionalProperties':True}
 
-def review_axes_prompt(series_labels,context=''):
+def review_axes_prompt(series_labels,context='',detected=None):
  # Calibration is read once from the whole figure; markers are judged per crop.
+ # Where Python measured the ticks, the reader only names them: a reader that
+ # estimates coordinates from a resized view shifts the whole calibration.
+ measured=''
+ if detected:
+  x=[[i,round(p,1)] for i,p in enumerate(detected.get('x_tick_pixels',[]))]
+  y=[[i,round(p,1)] for i,p in enumerate(detected.get('y_tick_pixels',[]))]
+  measured=f'''
+Python measured these ticks in the source pixels, as [index, pixel] pairs, left to
+right and top to bottom: x {json.dumps(x)}; y {json.dumps(y)}.
+Name them instead of locating them: each anchor must be
+{{"tick_index":index from the list above,"value":the printed value}} and must omit
+"pixel" entirely. Omit ticks whose printed label you cannot read, and any tick
+that carries no printed label.'''
  return f'''Independently read this chart's axis calibration and printed series labels.
 Do not classify individual data markers here.
 <source_context>{context}</source_context>
@@ -76,7 +89,7 @@ Return JSON:
 "y_axis":{{"scale":"log","unit":"ug/mL","anchors":[...]}}}},
 "series_labels":{{"printed label":"printed label"}},
 "missing_points":[],"status":"accepted","notes":[]}}
-Axis anchor pixels are x for x_axis and y for y_axis, in THIS image's pixels.
+Axis anchor pixels are x for x_axis and y for y_axis, in THIS image's pixels.{measured}
 Read the printed tick digits, minus signs, powers and multipliers afresh from the
 pixels. Do not infer digit values only from decade regularity. Give at least two
 well-separated anchors per numerical axis, preferably three. The first reader

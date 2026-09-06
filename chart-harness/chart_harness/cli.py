@@ -198,9 +198,17 @@ def run(args):
   # Review is split so no single call carries the whole figure: calibration once,
   # then a few candidates per crop of the original pixels, each call bounded.
   labels=[s['label'] for s in interpretation['series']]
+  detected=(interpretation.get('axis_tick_check') or {}).get('detected') or {}
   axes_review=stage('review_axes',lambda:reviewer.complete('review_axes',
-       review_axes_prompt(labels,context),images=[out/'working.png']+references,
+       review_axes_prompt(labels,context,detected),images=[out/'working.png']+references,
        schema=REVIEW_AXES_SCHEMA))
+  if detected and isinstance(axes_review.get('axis_check'),dict):
+   axis_check,dropped=axis_detect.resolve_tick_indices(axes_review['axis_check'],detected,
+     config.get('axis_tick_tolerance_px',6.))
+   axes_review={**axes_review,'axis_check':axis_check}
+   if dropped:axes_review['notes']=list(axes_review.get('notes',[]))+[
+     f'review anchors ignored, they name no measured tick: {json.dumps(dropped)}']
+   write_json(out/'review_axes_resolved.json',axes_review)
   batches=review_batches.plan(proposals['candidates'],size,
     batch_size=config.get('review_batch_size',review_batches.BATCH_SIZE),
     padding_px=config.get('review_batch_padding_px',review_batches.PADDING_PX),
