@@ -34,8 +34,8 @@ Opening `index.html` directly from disk also works (hash routing, no fetches).
 | `#/library/master` | Indication master sheet (reviewed records, evidence pages) | S5, S7 |
 | `#/library/templates` | Saved conversion templates | S2 |
 | `#/new/1…5` | New-from-starter wizard: choose → split/map → bind/adapt → key inputs → create | S2 |
-| `#/editor/W-102` | Three-pane editor; Inspect / Findings / Ask / Compare / History | S1, S3, S4, S6, S8, S10 |
-| `#/calculator` | Sample size, comparability filter, pooling, sensitivity heat-map, historical strip | S7 |
+| `#/editor/W-102` | Docs-style editor: title/menu/toolbar header, wide sidebar (Outline / Workflow / Analysis), paper canvas, Inspector (Inspect / Findings / Ask / Compare / History) | S1, S3, S4, S6, S8, S10 |
+| `#/calculator` | Sample size in three numbered steps, working comparability checkboxes + pooling, sensitivity table with reading guide, historical bar chart (by study / treatment effect / placebo only) | S7 |
 | `#/admin/*` | Users, per-work permissions, usage, models & providers, audit | S9, S11 |
 
 ## Walkthrough notes (what the mock taught us)
@@ -66,6 +66,43 @@ reflected in the docs):
 8. **Section 0 is visually distinct** in the outline (front matter, not a
    numbered M11 section) so the 15-entry internal outline does not read as
    "15 sections".
+
+Second round (user walkthrough feedback):
+
+9. **Calculator controls must be real controls.** Checkboxes now hold
+   per-study inclusion state (`state.calc.include`); excluded-by-filter rows
+   can still be deliberately included and are then flagged *included
+   despite*. Sliders re-render only the output panel (`calcSet`) so the thumb
+   never loses the drag, have 22px thumbs, and each has a numeric twin.
+10. **Headline before table.** "Result" became a sentence: *Enrol N to have
+    X% power to show … if the true rates are p1 vs p0*. The sensitivity
+    table has a "How to read" strip (rows = ratio, columns = effect ±5 pts,
+    outlined cell = current inputs). Panels are numbered 1-2-3 to give the
+    eye a path: endpoint → placebo evidence → assumptions → headline → fragility.
+11. **Historical performance as horizontal bars, three views.** The first
+    round's vertical dot strip was too abstract (no n, no arm names, study
+    labels truncated); vertical grouped bars were rejected on paper because
+    study names collide at 5+ studies. Horizontal grouped bars kept: study label
+    left, placebo/active bars with % and n, Δ bracket, faded rows for
+    excluded records. A *treatment effect* view puts the user's own
+    assumption (amber) next to history; a *placebo only* view shows exactly
+    what feeds the pooled estimate.
+12. **Uppercase, letter-spaced headers and tabs** everywhere (page titles,
+    panel headers, top nav, sidebar/inspector tabs, wizard steps).
+13. **Editor is document-first.** A persistent horizontal app bar sits over
+    every screen; the editor adds a Google-Docs-style header (title, save
+    state, presence, Share / Create version / Export), a menu bar with
+    real dropdowns (File … Model … Help) and a formatting toolbar. The
+    sidebar grew from a 260px outline rail to 340px with three tabs:
+    **Outline** (sections with completion bars and blocking dots),
+    **Workflow** (stages, personal queue, readiness predicates) and
+    **Analysis** (per-section completion vs blocking findings, provenance
+    mix, findings by check type, claims coverage, cross-section
+    dependencies, model usage). Blocks are `contenteditable` so typing feels
+    like a document (edits are not persisted in the mock).
+14. **The lower-left avatar opens an account menu** (my works, permissions,
+    administration, preferences, shortcuts, sign out); the same menu is
+    reachable from the top bar.
 
 ## Not in the mock
 

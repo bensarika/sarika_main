@@ -103,25 +103,43 @@ typed by the author (M11 forbids editing L1/L2 headings).
 
 ## 4. Layout
 
-**App frame:** 56-px left icon rail (Library, Workspace, Calculator, Compare,
-Admin) → content. Top bar (48 px) shows breadcrumb, version chip, presence
-avatars, autosave status, primary action.
+**App frame:** 56-px left icon rail (Workspace, Library, Calculator, Admin;
+avatar bottom-left opens the account menu) → a **persistent horizontal app
+bar** (44 px, slate-800) on every screen: brand, the same four destinations
+as uppercase tabs, global search, environment/revision, account. Screens
+that are not the editor add a 48-px white bar under it for breadcrumb and
+screen actions.
 
-**Editor (three panes, resizable):**
+**Headers and tabs are uppercase**, 11–12 px, 600 weight, `.08em` tracking
+(page titles, panel headers, every tab strip, wizard steps). Body copy,
+chips, buttons and document text stay mixed case.
+
+**Editor (document-first, Google-Docs-like):** under the app bar sits a
+document header — title + kind/version/starter, save state, presence,
+Share / Create version / Export — then a menu bar (FILE EDIT VIEW INSERT
+FORMAT TOOLS MODEL HELP) with dropdowns, then a formatting toolbar (undo,
+style, B/I/U, lists, table, Comment, Ask model, mode, Analysis, Findings).
+Below that, three panes:
 ```
-┌──────┬────────────────────────┬────────────────────────────────┬──────────────┐
-│ rail │ OUTLINE (260)          │ CANVAS (flex, max 820 text)    │ INSPECTOR    │
-│      │ 0 Title & control  92% │  3 TRIAL OBJECTIVES AND …      │ (360)        │
-│      │ 1 Protocol summary  ◔  │  3.1 Primary Objective(s) …    │ Bindings     │
-│      │ 2 Introduction     71% │  ┃ To evaluate the efficacy of │ Evidence     │
-│      │ 3 Objectives ●2    64% │  ┃ <DRUG> vs placebo …         │ Findings (2) │
-│      │ …                      │                                │ Comments     │
-│      │ ───────────────────    │                                │ History      │
-│      │ Overall 58% ▮▮▮▮▮░░░░  │                                │              │
-└──────┴────────────────────────┴────────────────────────────────┴──────────────┘
+┌──────┬────────────────────────────┬────────────────────────────────┬──────────────┐
+│ rail │ SIDEBAR (340)                │ CANVAS (paper, max 860)        │ INSPECTOR    │
+│      │ OUTLINE · WORKFLOW · ANALYSIS│  3 TRIAL OBJECTIVES AND …      │ (400)        │
+│      │ 0 Identity & control  100%   │  3.1 Primary Objective(s) …    │ INSPECT      │
+│      │ 3 Questions & outc.  90% ●●  │  ┃ To evaluate the efficacy of │ FINDINGS · 8 │
+│      │   └ 1 blocking · 1 warning … │  ┃ <DRUG> vs placebo …         │ ASK          │
+│      │ …                            │                                │ COMPARE      │
+│      │ Overall 64% ▮▮▮▮▮░░░ what's  │                                │ HISTORY      │
+│      │ Design-ready ✓ · Op. spec ✗  │                                │              │
+└──────┴────────────────────────────┴────────────────────────────────┴──────────────┘
 ```
-- Outline rows: number, title, completion %, finding dots (● error, ◐ warning,
-  ○ incomplete). Generated sections (1.1–1.3) show a "generated" glyph.
+- Sidebar tabs: **Outline** (sections with completion %, finding dots
+  ● error ◐ warning ○ incomplete; the active section expands to show its
+  M11 title, counts and a completion bar), **Workflow** (conversion → draft
+  → checks → review → version → export, the user's queue, readiness
+  predicates), **Analysis** (document-analysis pane: completion vs blocking
+  per section, provenance mix, findings by check type, claims coverage,
+  cross-section dependencies of the current section, model usage).
+  Generated sections (1.1–1.3) show a "generated" glyph.
 - Canvas: blocks have a 3-px left border coloured by provenance (none for
   author). Selected block gets `--accent-100` wash. Findings underline the
   offending span (wavy, coloured by severity). Placeholders `<…>` render in
@@ -131,9 +149,19 @@ avatars, autosave status, primary action.
 **Library / master sheet:** data-grid with sticky first column, row density
 32 px, filter chips, column groups (Trial · Design · Endpoints · Results).
 
-**Calculator:** two columns — inputs (form, left 380) and results (right):
-headline N per arm, total, assumptions list, sensitivity heat-grid, historical
-strip chart of the endpoint by drug.
+**Calculator:** two columns with a deliberate eye path. Left (400): three
+numbered panels — 1 ENDPOINT, 2 PLACEBO ASSUMPTION FROM EVIDENCE (checkbox
+per historical placebo arm, comparability reason, opt-in pooled rate), 3
+DESIGN ASSUMPTIONS (slider + numeric twin per parameter; edits re-render
+only the results). Right: **SAMPLE SIZE — WHAT YOU NEED TO ENROL** with a
+52-px headline N and a full sentence stating what it means, three secondary
+figures, then **WHAT IF MY ASSUMPTIONS ARE OFF?** — the sensitivity table
+preceded by a "How to read" strip. Below, **HISTORICAL … — WHAT OTHER
+TRIALS SAW**: horizontal grouped bars (study label left; placebo grey,
+active teal, JAK-profile violet, the user's assumption amber; % inside the
+bar, n and arm outside; Δ bracket; excluded rows faded) with three views:
+by study, treatment effect, placebo only. Every bar links to its source
+page.
 
 **Comparator:** selected criterion on top, similar criteria list below as
 two-column diffs; differences highlighted `--accent-100` background with

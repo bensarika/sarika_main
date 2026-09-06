@@ -35,21 +35,36 @@ const ICONS = {
   calc: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h3M13 12h3M8 16h3M13 16h3"/></svg>',
   admin: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>',
 };
+const NAV = [['works', '/library', 'Workspace'], ['library', '/library/studies', 'Library'], ['calc', '/calculator', 'Trial calculator'], ['admin', '/admin/users', 'Admin']];
 function rail(active) {
-  const item = (k, path, title) => h`<a href="#${path}" class="${active === k ? 'active' : ''}" title="${title}">${ICONS[k]}</a>`;
-  return h`<nav class="rail"><div class="logo">P</div>
-    ${item('works', '/library', 'Workspace')}
-    ${item('library', '/library/studies', 'Library')}
-    ${item('calc', '/calculator', 'Trial calculator')}
-    ${item('admin', '/admin/users', 'Admin')}
-    <div class="spacer"></div><div class="avatar" title="Ben Altman · admin">BA</div></nav>`;
+  const item = ([k, path, title]) => h`<a href="#${path}" class="${active === k ? 'active' : ''}" title="${title}">${ICONS[k]}</a>`;
+  return h`<nav class="rail"><div class="logo">P</div>${NAV.map(item).join('')}
+    <div class="spacer"></div><div class="avatar ${state.userMenu ? 'open' : ''}" title="Ben Altman · admin" onclick="event.stopPropagation();state.userMenu=!state.userMenu;render()">BA</div></nav>${state.userMenu ? userMenu() : ''}`;
+}
+/* Persistent horizontal bar: the same on every screen (Google-Docs-style app header). */
+function topnav(active) {
+  return h`<header class="topnav"><span class="brand">Protocol Studio</span>
+    ${NAV.map(([k, path, title]) => h`<a class="nav ${active === k ? 'active' : ''}" href="#${path}">${title}</a>`).join('')}
+    <div class="grow"></div><input class="search" placeholder="Search works, studies, criteria…  ( / )" onkeydown="if(event.key==='Enter')toast('Search: '+this.value+' (mock)')">
+    <span class="env">rev 42 · eu-west-1</span>
+    <span class="who" onclick="event.stopPropagation();state.userMenu=!state.userMenu;render()"><span class="avatar">BA</span>Ben</span></header>`;
+}
+function userMenu() {
+  return h`<div class="usermenu" onclick="event.stopPropagation()"><div class="head"><span class="avatar">BA</span><div><b>Ben Altman</b><div class="tiny muted">ben@sarika.com · ${chip('accent', 'admin')}</div></div></div>
+    <a onclick="go('/library');state.userMenu=false">My works <span class="k">3</span></a>
+    <a onclick="toast('Your permissions: owner W-102, W-098 · edit W-103 (mock)');state.userMenu=false;render()">My permissions</a>
+    <a onclick="go('/admin/users');state.userMenu=false">Administration <span class="k">admin</span></a>
+    <a onclick="toast('Preferences: theme, keyboard shortcuts, default model (mock)');state.userMenu=false;render()">Preferences <span class="k">,</span></a>
+    <a onclick="toast('Keyboard shortcuts panel (mock)');state.userMenu=false;render()">Keyboard shortcuts <span class="k">?</span></a>
+    <div class="foot"><a onclick="state.userMenu=false;go('/login')">Sign out</a></div></div>`;
 }
 function topbar(crumbs, right = '') {
   return h`<header class="topbar"><div class="crumbs">${crumbs}</div><div class="grow"></div>${right}</header>`;
 }
 function frame(active, crumbs, body, right = '') {
-  return h`<div class="app">${rail(active)}${topbar(crumbs, right)}<main class="main">${body}</main></div>`;
+  return h`<div class="app">${rail(active)}${topnav(active)}${topbar(crumbs, right)}<main class="main">${body}</main></div>`;
 }
+document.addEventListener('click', () => { if (state.userMenu || state.menu) { state.userMenu = false; state.menu = null; render(); } });
 function progress(pct, extra = '') {
   return h`<span class="progress"><span class="bar"><b style="width:${pct}%"></b><em style="left:60%" title="design-ready"></em><em style="left:85%" title="operationally specified"></em></span><span class="mono">${pct}%</span>${extra}</span>`;
 }
@@ -130,7 +145,7 @@ function wizardView(step) {
     <div class="kpis"><div class="kpi"><div class="v">64%</div><div class="l">complete (approved &amp; applicable slots)</div></div><div class="kpi"><div class="v">59</div><div class="l">proposals to review</div></div><div class="kpi"><div class="v">7</div><div class="l">not carried over — review required</div></div><div class="kpi"><div class="v">5</div><div class="l">blocking findings (rev 1)</div></div></div>
     <label class="tiny" style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" checked> Save as template <b>"Temtokibart P2b → anti-OX40L"</b> (mapping + block decisions + decision register; study-specific answers are re-asked on reuse)</label>
     <button class="btn primary" onclick="go('/editor/W-102')">Create work SRK-201</button>`;
-  return h`<div class="app">${rail('works')}${topbar(h`<a href="#/library">Workspace</a><span class="sep">/</span><b>New protocol from starter</b>`)}<main class="main"><div class="wizard">${side}<div class="wbody">${body}</div></div></main></div>`;
+  return h`<div class="app">${rail('works')}${topnav('works')}${topbar(h`<a href="#/library">Workspace</a><span class="sep">/</span><b>New protocol from starter</b>`)}<main class="main"><div class="wizard">${side}<div class="wbody">${body}</div></div></main></div>`;
 }
 
 /* ---------- Editor ---------- */
@@ -151,23 +166,73 @@ function editorView(workId) {
   const w = WORKS.find((x) => x.id === workId) || WORKS[0];
   const sec = OUTLINE[state.section];
   const dots = (s) => h`<span class="dots">${s.err ? '<i style="background:var(--state-error)"></i>' : ''}${s.warn ? '<i style="background:var(--state-warning)"></i>' : ''}${s.inc ? '<i style="background:var(--state-incomplete)"></i>' : ''}</span>`;
-  const outline = h`<aside class="outline"><div class="hdr">Outline · ICH M11</div>
-    ${OUTLINE.map((s) => h`<div class="sec ${s.n === state.section ? 'active' : ''} ${s.n === 0 ? 'section0' : ''}" onclick="selectSection(${s.n})" title="${s.m11}"><span class="n">${s.n}</span><span class="t">${esc(s.title)}</span><span class="pct">${s.pct}%${dots(s)}</span></div>`).join('')}
-    <div class="foot"><div class="tiny muted" style="margin-bottom:4px">Overall</div>${progress(w.pct, h`<a href="#" onclick="setTab('findings');return false">what's left</a>`)}<div class="tiny muted" style="margin-top:6px">Design-ready ✓ · Operationally specified ✗ (R04, R11) · Formal review ✗</div></div></aside>`;
+  const outline = h`<div class="outline"><div class="hdr"><span>Sections · ICH M11</span><span>${OUTLINE.reduce((a, s) => a + s.err, 0)} blocking</span></div>
+    ${OUTLINE.map((s) => h`<div class="sec ${s.n === state.section ? 'active' : ''} ${s.n === 0 ? 'section0' : ''}" onclick="selectSection(${s.n})" title="${s.m11}"><span class="n">${s.n}</span><span class="t">${esc(s.title)}</span><span class="pct">${s.pct}%${dots(s)}</span>
+      ${s.n === state.section ? h`<span class="d">${s.m11} · ${s.err} blocking · ${s.warn} warnings · ${s.inc} required slots open</span><span class="bar"><b style="width:${s.pct}%"></b></span>` : ''}</div>`).join('')}
+    <div class="foot"><div class="tiny muted" style="margin-bottom:4px">Overall completion (approved, applicable required slots)</div>${progress(w.pct, h`<a href="#" onclick="setSide('workflow');return false">what's left</a>`)}<div class="tiny muted" style="margin-top:6px">Design-ready ✓ · Operationally specified ✗ (R04, R11) · Formal review ✗</div></div></div>`;
+  const stabs = ['outline', 'workflow', 'analysis'];
+  const sidebar = h`<aside class="sidebar"><div class="stabs">${stabs.map((t) => h`<a href="#" class="${(state.side || 'outline') === t ? 'active' : ''}" onclick="setSide('${t}');return false">${t}</a>`).join('')}</div>
+    ${(state.side || 'outline') === 'outline' ? outline : state.side === 'workflow' ? workflowHtml(w) : analysisHtml(w)}</aside>`;
 
   const canvas = state.section === 3 ? BLOCKS_S3.map(blockHtml).join('') : h`<h2>${esc(sec.m11)}</h2><div class="gen-note">Mock: only Section 3 is populated in this clickable mock. Other sections show the same block model.</div>${state.section === 8 ? soaHtml() : h`<div class="block author"><span class="ph">Section ${sec.n} content …</span></div>`}`;
   const canvasWrap = h`<section class="canvas-wrap"><article class="canvas"><h1>${esc(sec.m11)} <span class="heading-tag">Section ${sec.n} · ${sec.pct}% · ${sec.err} blocking</span></h1>${canvas}</article></section>`;
 
-  return h`<div class="app">${rail('works')}${topbar(h`<a href="#/library">Workspace</a><span class="sep">/</span><b>${esc(w.title)}</b><span class="sep">·</span><span class="mono">${w.version} · rev 42</span>`,
-    h`<span class="save-status"><i></i>Saved 8 s ago</span><div class="presence"><span style="background:#3A4B5E">BA</span><span style="background:#6E4BC4">MK</span></div><button class="btn sm" onclick="toast('History: autosave snapshots + versions (mock)')">History</button><button class="btn sm" onclick="toast('Create version: semantic diff vs v0.2 shown; readiness predicate lists failing clauses (mock)')">Create version</button><button class="btn sm primary" onclick="toast('Export → PDF (LaTeX/Tectonic) · DOCX; job queued (mock)')">Export</button>`)}
-    <main class="main"><div class="editor">${outline}${canvasWrap}${inspector()}</div></main></div>`;
+  return h`<div class="app no-topbar">${rail('works')}${topnav('works')}
+    <main class="main" style="display:flex;flex-direction:column;overflow:hidden">${docHead(w)}<div class="editor">${sidebar}${canvasWrap}${inspector()}</div></main></div>`;
 }
+
+/* Google-Docs-style document header: title row, menu bar, formatting toolbar. */
+const MENUS = {
+  File: [['New from starter…', ''], ['Open…', '⌘O'], ['Create version…', ''], ['Version history', ''], ['-'], ['Export → PDF (LaTeX)', ''], ['Export → DOCX', ''], ['Export model (JSON)', ''], ['-'], ['Share & permissions…', ''], ['Document details', '']],
+  Edit: [['Undo', '⌘Z'], ['Redo', '⇧⌘Z'], ['-'], ['Find in document', '⌘F'], ['Find object (EP-, EST-, …)', '⌘K'], ['-'], ['Mark block Not applicable', ''], ['Revert text to model', '']],
+  View: [['Show provenance borders', '✓'], ['Show claim underlines', '✓'], ['Show generated views', '✓'], ['-'], ['Reading mode (M11 render)', ''], ['Compare with v0.2', ''], ['Suggesting mode', '']],
+  Insert: [['Section (from M11 outline)', ''], ['Table', ''], ['Generated view: SoA / endpoint table / synopsis', ''], ['Reference', ''], ['Comment', '⌘⌥M'], ['Proposal from Ask…', '']],
+  Format: [['Heading level', ''], ['Bold / Italic / Underline', ''], ['Bulleted / numbered list', ''], ['-'], ['M11 text class: universal / optional / instructional', '']],
+  Tools: [['Run checks now', ''], ['Trial calculator', ''], ['Criteria comparator', ''], ['Decision register', ''], ['Readiness report', '']],
+  Model: [['Ask about selection…', '⌘⇧A'], ['Draft rationale', ''], ['Suggest rewrite', ''], ['Explain finding', ''], ['-'], ['Context sent to model…', ''], ['Model: GPT-6 Astra', '']],
+  Help: [['Keyboard shortcuts', '?'], ['ICH M11 guidance', ''], ['E9(R1) estimands', ''], ['About Protocol Studio', '']],
+};
+function docHead(w) {
+  return h`<div class="dochead"><div class="title"><span class="docicon"></span><div><h2>${esc(w.title)}</h2><div class="sub">${w.kind} · ${w.version} · rev 42 · Starter: ${esc(w.starter)}</div></div><div class="grow"></div>
+      <span class="save-status"><i></i>All changes saved · 8 s ago</span><div class="presence"><span style="background:#3A4B5E" title="Ben Altman">BA</span><span style="background:#6E4BC4" title="Maya K. · editing §10">MK</span></div>
+      <button class="btn sm" onclick="toast('Share: per-user view / comment / edit; data class confidential (mock)')">Share</button><button class="btn sm" onclick="toast('Create version: semantic diff vs v0.2; readiness predicate lists failing clauses (mock)')">Create version</button><button class="btn sm primary" onclick="toast('Export → PDF (LaTeX/Tectonic) · DOCX; job queued (mock)')">Export</button></div>
+    <nav class="menubar">${Object.keys(MENUS).map((m) => h`<a class="${state.menu === m ? 'open' : ''}" onclick="event.stopPropagation();state.menu=state.menu==='${m}'?null:'${m}';render()">${m}${state.menu === m ? h`<div class="dd">${MENUS[m].map(([l, k]) => l === '-' ? '<hr>' : h`<div onclick="toast('${esc(l)} (mock)')">${esc(l)}<span class="k">${k}</span></div>`).join('')}</div>` : ''}</a>`).join('')}</nav>
+    <div class="doctools">${['↶', '↷'].map((x) => h`<button title="Undo/Redo">${x}</button>`).join('')}<span class="sep"></span>
+      <select><option>Body text</option><option>Heading 2</option><option>Heading 3</option><option>Instructional (remove before final)</option></select><span class="sep"></span>
+      <button style="font-weight:700">B</button><button style="font-style:italic">I</button><button style="text-decoration:underline">U</button><span class="sep"></span>
+      <button title="Bulleted list">•≡</button><button title="Numbered list">1≡</button><button title="Table">▦</button><span class="sep"></span>
+      <button onclick="toast('Comment (mock)')">💬 Comment</button><button onclick="setTab('ask')">✦ Ask model</button><button class="on" title="Editing mode">✎ Editing</button><span class="sep"></span>
+      <button onclick="setSide('analysis')">Analysis</button><button onclick="setTab('findings')">Findings · ${FINDINGS.length}</button></div></div>`;
+}
+function workflowHtml(w) {
+  const stages = [['Starter conversion', 'done', 'template applied · 38 decisions answered'], ['Draft & bind', 'now', '59 proposals to review · 7 not carried over'], ['Checks', 'now', '5 blocking · 3 warnings · 2 candidates to adjudicate'], ['Internal review', '', 'reviewers: MK (stats), Priya S. (regulatory)'], ['Version v0.4', '', 'readiness: formal review ✗'], ['Export & submit', '', 'PDF (LaTeX) + DOCX']];
+  return h`<div class="wf"><h5 style="margin-top:0">Workflow · ${esc(w.id)}</h5>${stages.map(([n, s, d], i) => h`<div class="stage ${s}"><i>${s === 'done' ? '✓' : i + 1}</i><div><b>${n}</b><div class="tiny">${d}</div></div></div>`).join('')}
+    <h5>What's left (your queue)</h5>
+    ${[[59, 'proposals awaiting approval', "setTab('inspect')"], [5, 'blocking findings', "setTab('findings')"], [7, 'blocks not carried over — review', "selectSection(2)"], [12, 'study-specific decisions to confirm', "toast('Decision register (mock)')"], [2, 'candidate findings to adjudicate', "setTab('findings')"], [3, 'open comments (MK)', "toast('Comments (mock)')"]].map(([n, t, a]) => h`<div class="task" onclick="${a}"><span class="n">${n}</span><span>${t}</span></div>`).join('')}
+    <h5>Readiness predicates</h5>
+    ${[['Design-ready', true, 'objectives, endpoints, estimands, design bound'], ['Operationally specified', false, 'R04 SoA gap · R11 rescue rule unlinked'], ['Ready for formal review', false, '5 errors · 2 candidates · 12 decisions']].map(([n, ok, d]) => h`<div class="stage ${ok ? 'done' : ''}"><i>${ok ? '✓' : '✗'}</i><div><b>${n}</b><div class="tiny">${d}</div></div></div>`).join('')}</div>`;
+}
+function analysisHtml(w) {
+  const prov = [['source', 31], ['inherited', 38], ['derived', 12], ['proposed', 14], ['author', 5]];
+  const colors = { source: 'var(--prov-source)', inherited: 'var(--prov-inherited)', derived: 'var(--prov-derived)', proposed: 'var(--prov-proposed)', author: 'var(--slate-400)' };
+  return h`<div class="an"><h5 style="margin-top:0">Document analysis · rev 42</h5>
+    <div class="tiny muted" style="margin-bottom:8px">Completion per section (bar) with blocking findings (red ticks). Click a row to jump.</div>
+    ${OUTLINE.map((s) => h`<div class="hbar" onclick="selectSection(${s.n})"><span class="n">${s.n}</span><span class="t"><b style="width:${s.pct}%"></b>${Array.from({ length: s.err }).map((_, i) => h`<s style="left:${s.pct + 3 + i * 5}%"></s>`).join('')}</span><span class="v">${s.pct}%</span></div>`).join('')}
+    <h5>Provenance mix (blocks)</h5><div class="stack">${prov.map(([k, v]) => h`<i style="width:${v}%;background:${colors[k]}"></i>`).join('')}</div><div class="lg">${prov.map(([k, v]) => h`<span><i style="background:${colors[k]}"></i>${k} ${v}%</span>`).join('')}</div>
+    <h5>Findings by check type</h5>
+    ${[['Model consistency (R03/R07/R10/R13)', 3, 'error'], ['Structure & required slots (R01/R12)', 1, 'error'], ['Schedule ↔ endpoints (R04)', 1, 'error'], ['Estimand & rescue links (R11/R14)', 2, 'warning'], ['Change impact (R22)', 1, 'warning']].map(([t, n, s]) => h`<div class="finding" style="padding:5px 0"><span class="sev ${s}" style="width:10px;height:10px;margin-top:4px"></span><div class="msg" style="font-size:12px">${t} <b class="mono">${n}</b></div></div>`).join('')}
+    <h5>Claims coverage</h5><div class="tiny">214 sentences · <b>171 checked</b> · 2 mismatch · 9 unbound · 3 ambiguous · 29 no claim (narrative)</div>
+    <h5>Cross-section dependencies of §${state.section}</h5>
+    ${[['EP-02 (EASI-75 W16)', '§1 synopsis · §8 SoA · §10.2 primary analysis'], ['EST-01', '§10.3 estimator · SAP §4.1'], ['RL-03 rescue rule', '§6.5 rescue · §7.2 discontinuation']].map(([a, b]) => h`<div class="dep"><b>${a}</b> → <span class="mono">${b}</span></div>`).join('')}
+    <h5>Model usage on this document</h5><div class="tiny">gpt-6-astra · 41 adapt proposals · 3 Ask threads · 184k tokens · $6.90 · all calls: data class confidential → approved</div></div>`;
+}
+function setSide(t) { state.side = t; render(); }
 function blockHtml(b) {
   if (b.kind === 'h2') return h`<h2>${b.text}</h2>`;
   const sel = b.id === state.block ? 'selected' : '';
-  return h`<div class="block ${b.prov} ${sel} ${b.gen ? 'generated' : ''}" onclick="selectBlock('${b.id}')">${b.text}
-    <span class="bmenu"><button class="btn sm ghost" onclick="event.stopPropagation();askAbout('${b.id}')">Ask</button><button class="btn sm ghost" onclick="event.stopPropagation();toast('Comment thread (mock)')">Comment</button></span>
-    <span class="btags">${chip(b.prov, b.prov)}${b.na ? chip('na', 'not applicable') : ''}${b.prov === 'proposed' ? chip('incomplete', 'unapproved') : chip('ok', 'approved · rev 37')}${b.bind.map((x) => chip('mono', x)).join('')}</span></div>`;
+  return h`<div class="block ${b.prov} ${sel} ${b.gen ? 'generated' : ''}" ${b.gen ? '' : 'contenteditable="true" spellcheck="false"'} onclick="selectBlock('${b.id}')">${b.text}
+    <span class="bmenu" contenteditable="false"><button class="btn sm ghost" onclick="event.stopPropagation();askAbout('${b.id}')">Ask</button><button class="btn sm ghost" onclick="event.stopPropagation();toast('Comment thread (mock)')">Comment</button></span>
+    <span class="btags" contenteditable="false">${chip(b.prov, b.prov)}${b.na ? chip('na', 'not applicable') : ''}${b.prov === 'proposed' ? chip('incomplete', 'unapproved') : chip('ok', 'approved · rev 37')}${b.bind.map((x) => chip('mono', x)).join('')}</span></div>`;
 }
 function soaHtml() {
   const cols = ['Scr', 'W0', 'W2', 'W4', 'W8', 'W12', 'W16', 'EOS'];
@@ -233,7 +298,7 @@ function askSend(text) {
   }, 35);
 }
 function askAbout(blockId, findingId) { if (blockId) state.block = blockId; state.itab = 'ask'; render(); }
-function selectBlock(id) { state.block = id; if (state.itab === 'findings') state.itab = 'inspect'; render(); }
+function selectBlock(id) { if (state.block === id) return; state.block = id; if (state.itab === 'findings') state.itab = 'inspect'; render(); }
 function selectSection(n) { state.section = n; render(); }
 function setTab(t) { state.itab = t; render(); }
 
@@ -255,42 +320,92 @@ function sampleSize(p0, p1, alpha, power, ratio) {
   const n0 = Math.pow(za * Math.sqrt((1 + 1 / k) * pbar * (1 - pbar)) + zb * Math.sqrt(p0 * (1 - p0) + p1 * (1 - p1) / k), 2) / Math.pow(p1 - p0, 2);
   return { n0: Math.ceil(n0), n1: Math.ceil(n0 * k) };
 }
-function calculatorView() {
+function calcRows() {
+  return HIST.filter((r) => r.endpoint === 'EASI-75').map((r) => ({ ...r, s: STUDIES.find((y) => y.id === r.study) }));
+}
+function calcIncluded() {
+  if (!state.calc.include) state.calc.include = new Set(HIST.filter((r) => r.arm === 'placebo' && r.comparable).map((r) => r.study));
+  return state.calc.include;
+}
+function calcPooled() {
+  const inc = calcRows().filter((r) => r.arm === 'placebo' && calcIncluded().has(r.study));
+  if (!inc.length) return null;
+  return { pct: inc.reduce((a, r) => a + r.pct * r.n, 0) / inc.reduce((a, r) => a + r.n, 0), n: inc.length, lo: Math.min(...inc.map((x) => x.pct)), hi: Math.max(...inc.map((x) => x.pct)) };
+}
+function calcToggle(studyId) {
+  const inc = calcIncluded(); inc.has(studyId) ? inc.delete(studyId) : inc.add(studyId);
+  if (state.calc.pool) { const p = calcPooled(); if (p) state.calc.p0 = +(p.pct / 100).toFixed(3); }
+  render();
+}
+function calcPool(on) { state.calc.pool = on; if (on) { const p = calcPooled(); if (p) state.calc.p0 = +(p.pct / 100).toFixed(3); } render(); }
+/* Slider/number edits update only the outputs, so the thumb never loses the drag. */
+function calcSet(k, v) {
+  state.calc[k] = +v; if (k === 'p0') state.calc.pool = false;
+  const fmt = CALC_FIELDS.find((f) => f[0] === k)[5];
+  const lab = $('#lab-' + k); if (lab) lab.textContent = fmt(state.calc[k]);
+  const num = $('#num-' + k); if (num && document.activeElement !== num) num.value = fmt(state.calc[k]).replace(/[%:1]/g, '');
+  const rng = $('#rng-' + k); if (rng && document.activeElement !== rng) rng.value = state.calc[k];
+  const out = $('#calc-out'); if (out) out.innerHTML = calcOutHtml();
+  const pool = $('#pool-box'); if (pool) pool.checked = state.calc.pool;
+}
+const CALC_FIELDS = [
+  ['p0', 'Placebo response at Week 16', 0.05, 0.4, 0.005, (v) => (v * 100).toFixed(1) + '%', 100],
+  ['p1', 'Anticipated SRK-201 response at Week 16', 0.2, 0.9, 0.005, (v) => (v * 100).toFixed(1) + '%', 100],
+  ['alpha', 'Significance level α (two-sided)', 0.01, 0.1, 0.005, (v) => v.toFixed(3), 1],
+  ['power', 'Power (1 − β)', 0.7, 0.95, 0.01, (v) => (v * 100).toFixed(0) + '%', 100],
+  ['ratio', 'Allocation ratio SRK-201 : placebo', 1, 3, 1, (v) => v + ':1', 1],
+  ['dropout', 'Expected dropout (inflates N)', 0, 0.3, 0.01, (v) => (v * 100).toFixed(0) + '%', 100],
+];
+function calcOutHtml() {
   const c = state.calc;
-  const comp = HIST.filter((r) => r.arm === 'placebo' && r.endpoint === 'EASI-75');
-  const inc = comp.filter((r) => r.comparable);
-  const pooled = inc.reduce((a, r) => a + r.pct * r.n, 0) / inc.reduce((a, r) => a + r.n, 0);
   const r = sampleSize(c.p0, c.p1, c.alpha, c.power, c.ratio);
-  const total = Math.ceil((r.n0 + r.n1) / (1 - c.dropout));
+  const evaluable = r.n0 + r.n1, total = Math.ceil(evaluable / (1 - c.dropout));
   const grid = [1, 2, 3].map((k) => [-0.05, 0, 0.05].map((d) => { const x = sampleSize(c.p0, c.p1 + d, c.alpha, c.power, k); return Math.ceil((x.n0 + x.n1) / (1 - c.dropout)); }));
-  const inp = (k, label, min, max, step, fmt) => h`<div class="field"><label>${label} <span class="mono muted">${fmt(c[k])}</span></label><input type="range" min="${min}" max="${max}" step="${step}" value="${c[k]}" oninput="state.calc.${k}=+this.value;render()"></div>`;
-  const body = h`<div class="page"><h1>Trial calculator</h1><div class="sub">Sample size for superiority · EASI-75 at Week 16 · two-proportion, normal approximation (formula documented in packages/stats; verified against published tables before Pilot D ships)</div>
-  <div class="calc"><div class="panel"><h3>Inputs</h3><div class="body">
-    <div class="field"><label>Endpoint · timepoint</label><div class="row"><select><option>EASI-75 (responder)</option><option>EASI-90</option><option>EASI CFB (continuous)</option><option>PP-NRS ≥4</option></select><select><option>Week 16</option><option>Week 12</option></select></div></div>
-    <div class="field"><label>Comparator (placebo) — from reviewed historical records</label>
-      <div class="tiny">${comp.map((x) => { const s = STUDIES.find((y) => y.id === x.study); return h`<div style="display:grid;grid-template-columns:16px 1fr auto auto;gap:2px 6px;align-items:center;padding:4px 0;border-bottom:1px dashed var(--slate-200)"><input type="checkbox" ${x.comparable ? 'checked' : 'disabled'}><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(s.name)}">${esc(s.name)} <span class="muted">${x.tp}</span></span><span class="mono">${x.pct}%</span>${chip('source', 'p.' + x.page)}${x.why ? h`<span></span><span style="grid-column:2/5">${chip('na', 'excluded: ' + x.why)}</span>` : ''}</div>`; }).join('')}</div>
-      <div class="tiny" style="margin-top:6px"><label><input type="checkbox" ${c.pool ? 'checked' : ''} onchange="state.calc.pool=this.checked;state.calc.p0=${(pooled / 100).toFixed(3)};render()"> Pool included records (n-weighted) → ${pooled.toFixed(1)}%; between-study range ${Math.min(...inc.map((x) => x.pct))}–${Math.max(...inc.map((x) => x.pct))}%</label></div></div>
-    ${inp('p0', 'Placebo response', 0.05, 0.4, 0.005, (v) => (v * 100).toFixed(1) + '%')}
-    ${inp('p1', 'Anticipated SRK-201 response', 0.2, 0.9, 0.005, (v) => (v * 100).toFixed(1) + '%')}
-    ${inp('alpha', 'α (two-sided)', 0.01, 0.1, 0.005, (v) => v.toFixed(3))}
-    ${inp('power', 'Power', 0.7, 0.95, 0.01, (v) => (v * 100).toFixed(0) + '%')}
-    ${inp('ratio', 'Allocation ratio active:placebo', 1, 3, 1, (v) => v + ':1')}
-    ${inp('dropout', 'Dropout', 0, 0.3, 0.01, (v) => (v * 100).toFixed(0) + '%')}
-  </div></div>
-  <div><div class="panel" style="margin-bottom:16px"><h3>Result <span class="grow"></span><button class="btn sm" onclick="toast('Saved to work W-102 §10.11 as author-supplied sample_size with these assumptions (mock)')">Save to protocol §10.11</button></h3><div class="body">
-    <div class="result-head"><div><div class="big">${total}</div><div class="lbl">total participants (incl. ${(c.dropout * 100).toFixed(0)}% dropout)</div></div><div><div class="big">${r.n1}</div><div class="lbl">SRK-201 (evaluable)</div></div><div><div class="big">${r.n0}</div><div class="lbl">placebo (evaluable)</div></div><div><div class="big">${((c.p1 - c.p0) * 100).toFixed(0)}</div><div class="lbl">pts absolute difference</div></div></div>
-    <div class="tiny muted">Assumptions: p₀ ${(c.p0 * 100).toFixed(1)}% (${c.pool ? 'pooled ' + inc.length + ' records' : 'manual'}), p₁ ${(c.p1 * 100).toFixed(1)}%, α ${c.alpha}, power ${(c.power * 100).toFixed(0)}%, ratio ${c.ratio}:1. Unsupported here: Bayesian decision rules, precision-based N — stated, not forced.</div>
-    <h5 class="muted" style="margin:16px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Sensitivity — total N by allocation ratio × anticipated effect</h5>
-    <table class="heat"><thead><tr><th></th><th>p₁ −5 pts</th><th>p₁</th><th>p₁ +5 pts</th></tr></thead><tbody>${grid.map((row, i) => h`<tr><th>${i + 1}:1</th>${row.map((v, j) => h`<td class="${v > total * 1.3 ? 'h4' : v > total * 1.1 ? 'h3' : v > total * 0.9 ? 'h2' : 'h1'} ${i + 1 === c.ratio && j === 1 ? 'sel' : ''}">${v}</td>`).join('')}</tr>`).join('')}</tbody></table>
-  </div></div>
-  <div class="panel"><h3>Historical performance · EASI-75 · Week 12–16 <span class="grow"></span><span class="tiny muted">click a point to open its source page</span></h3><div class="body">
-    <div class="strip">${[0, 25, 50, 75].map((y) => h`<span class="yl" style="bottom:${y}%">${y}%</span>`).join('')}
-      ${HIST.filter((x) => x.endpoint === 'EASI-75').map((x, i) => { const s = STUDIES.find((y) => y.id === x.study); const left = 8 + (STUDIES.indexOf(s)) * 13; return h`<span class="dot ${x.arm === 'placebo' ? 'pbo' : x.jak ? 'jak' : 'act'}" style="left:${left}%;bottom:${x.pct}%" title="${esc(s.name)} · ${x.arm} · ${x.pct}% (n=${x.n}) · p. ${x.page}${x.why ? ' · excluded: ' + x.why : ''}" onclick="toast('Open ${esc(s.name)} p. ${x.page} (mock)')"></span>`; }).join('')}
-      ${STUDIES.map((s, i) => h`<span class="xl" style="left:${8 + i * 13}%">${s.drug.slice(0, 9)}</span>`).join('')}</div>
-    <div class="legend"><span><i style="background:var(--slate-400)"></i>placebo</span><span><i style="background:var(--accent-700)"></i>active</span><span><i style="background:var(--prov-inherited)"></i>JAK-like profile source</span></div>
+  const p = calcPooled();
+  return h`<div class="headline"><div class="big">${total}</div><div class="lead">Enrol <b>${total} participants</b> (${Math.ceil(r.n1 / (1 - c.dropout))} SRK-201 : ${Math.ceil(r.n0 / (1 - c.dropout))} placebo) to have <b>${(c.power * 100).toFixed(0)}% power</b> to show SRK-201 is superior to placebo on <b>EASI-75 at Week 16</b>, if the true response rates are <b>${(c.p1 * 100).toFixed(0)}% vs ${(c.p0 * 100).toFixed(0)}%</b>, at two-sided α = ${c.alpha}, allowing ${(c.dropout * 100).toFixed(0)}% dropout.
+      <div class="tiny">Placebo assumption source: ${c.pool && p ? `pooled from ${p.n} included historical records (n-weighted ${p.pct.toFixed(1)}%, range ${p.lo}–${p.hi}%)` : 'entered manually — tick "Use pooled" to derive it from the evidence on the left'}. Method: two-proportion normal approximation.</div></div></div>
+    <div class="split"><div><div class="v">${evaluable}</div><div class="l">evaluable participants needed</div></div><div><div class="v">${r.n1} : ${r.n0}</div><div class="l">SRK-201 : placebo (evaluable)</div></div><div><div class="v">${((c.p1 - c.p0) * 100).toFixed(0)} pts</div><div class="l">absolute difference detected</div></div></div>
+    <h5 class="muted" style="margin:6px 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em">What if my assumptions are off? — total N to enrol</h5>
+    <div class="howto"><b>How to read:</b> rows change the allocation ratio; columns assume the true SRK-201 response is 5 points lower or higher than you entered. The <b>outlined cell</b> is your current inputs; darker cells need more participants. A small effect (left column) is what drives N up.</div>
+    <table class="heat"><thead><tr><th>allocation ↓ / true effect →</th><th>SRK-201 ${((c.p1 - 0.05) * 100).toFixed(0)}% (worse)</th><th>SRK-201 ${(c.p1 * 100).toFixed(0)}% (as entered)</th><th>SRK-201 ${((c.p1 + 0.05) * 100).toFixed(0)}% (better)</th></tr></thead><tbody>${grid.map((row, i) => h`<tr><th>${i + 1}:1</th>${row.map((v, j) => h`<td class="${v > total * 1.3 ? 'h4' : v > total * 1.1 ? 'h3' : v > total * 0.9 ? 'h2' : 'h1'} ${i + 1 === c.ratio && j === 1 ? 'sel' : ''}">${v}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    <div class="tiny muted" style="margin-top:8px">Not modelled here (stated, never silently assumed): interim analyses, multiplicity across endpoints, Bayesian decision rules, precision-based sizing.</div>`;
+}
+function histChartHtml() {
+  const view = state.calc.view || 'study';
+  const rows = calcRows(); const inc = calcIncluded();
+  const byStudy = {}; rows.forEach((r) => { (byStudy[r.study] = byStudy[r.study] || { s: r.s, tp: r.tp }); byStudy[r.study][r.arm === 'placebo' ? 'pbo' : 'act'] = r; });
+  const studies = Object.values(byStudy).sort((a, b) => (b.act ? b.act.pct : 0) - (a.act ? a.act.pct : 0));
+  const W = (pct) => `width:${pct}%`;
+  const bar = (r, cls) => r ? h`<span class="bar ${cls} ${r.jak ? 'jak' : ''} ${r.pct < 12 ? 'out' : ''}" style="${W(r.pct)}" title="${esc(r.s.name)} · ${r.arm} · ${r.pct}% (n=${r.n}) · p. ${r.page}" onclick="toast('Open ${esc(r.s.name)} p. ${r.page} (mock)')">${r.pct.toFixed(1)}%<span class="n">n=${r.n} · ${esc(r.arm)}</span></span>` : '';
+  const axis = h`<span></span><div class="axis">${[0, 20, 40, 60, 80].map((v) => h`<span style="left:${v}%">${v}%</span>`).join('')}</div>`;
+  let body = '';
+  if (view === 'study') body = studies.map((g) => { const ex = g.pbo && !inc.has(g.pbo.study); return h`<div class="lab"><b>${esc(g.s.name.replace(/ \(.*\)/, ''))}</b><span class="tiny">${g.s.moa} · Phase ${g.s.phase} · ${g.tp}${ex ? ' · <span style="color:var(--state-incomplete)">excluded from pooling</span>' : ''}</span></div><div class="row ${ex ? 'excluded' : ''}">${bar(g.pbo, 'pbo')}${g.act ? bar(g.act, 'act') : '<span class="bar act out" style="width:0"><span class="n muted">active arm not yet extracted</span></span>'}${g.act && g.pbo ? h`<span class="delta" style="left:${g.pbo.pct}%;width:${g.act.pct - g.pbo.pct}%"><span>Δ ${(g.act.pct - g.pbo.pct).toFixed(0)} pts</span></span>` : ''}</div>`; }).join('') + axis;
+  if (view === 'delta') body = h`<div class="grp">Treatment effect vs placebo (active − placebo, percentage points)</div>` + studies.filter((g) => g.act && g.pbo).map((g) => h`<div class="lab"><b>${esc(g.s.name.replace(/ \(.*\)/, ''))}</b><span class="tiny">${g.act.arm} · ${g.tp}</span></div><div class="row dchart"><span class="bar act ${g.act.jak ? 'jak' : ''}" style="${W(g.act.pct - g.pbo.pct)}">+${(g.act.pct - g.pbo.pct).toFixed(1)} pts<span class="n">${g.act.pct}% vs ${g.pbo.pct}%</span></span></div>`).join('') + h`<div class="lab"><b>Your assumption</b><span class="tiny">SRK-201 vs placebo</span></div><div class="row dchart"><span class="bar act" style="${W((state.calc.p1 - state.calc.p0) * 100)};background:var(--prov-proposed)">+${((state.calc.p1 - state.calc.p0) * 100).toFixed(0)} pts<span class="n">${(state.calc.p1 * 100).toFixed(0)}% vs ${(state.calc.p0 * 100).toFixed(0)}%</span></span></div>` + axis;
+  if (view === 'placebo') body = h`<div class="grp">Placebo response only — what feeds the pooled estimate</div>` + rows.filter((r) => r.arm === 'placebo').sort((a, b) => b.pct - a.pct).map((r) => h`<div class="lab"><b>${esc(r.s.name.replace(/ \(.*\)/, ''))}</b><span class="tiny">${r.tp} · n=${r.n}${r.why ? ' · ' + esc(r.why) : ''}</span></div><div class="row dchart ${inc.has(r.study) ? '' : 'excluded'}">${bar(r, 'pbo')}</div>`).join('') + axis;
+  return h`<div class="hchart">${body}</div>
+    <div class="legend"><span><i style="background:var(--slate-400)"></i>placebo arm</span><span><i style="background:var(--accent-700)"></i>active arm</span><span><i style="background:var(--prov-inherited)"></i>active arm in the "JAK-like" profile</span><span><i style="background:var(--prov-proposed)"></i>your assumption</span><span style="opacity:.5">faded = excluded from pooling</span></div>`;
+}
+function calculatorView() {
+  const c = state.calc; calcIncluded();
+  const comp = calcRows().filter((r) => r.arm === 'placebo');
+  const p = calcPooled();
+  const inp = ([k, label, min, max, step, fmt, scale]) => h`<div class="field"><label>${label} <span class="mono" id="lab-${k}" style="color:var(--accent-700);font-weight:600">${fmt(c[k])}</span></label>
+    <div class="slider"><input type="range" id="rng-${k}" min="${min}" max="${max}" step="${step}" value="${c[k]}" oninput="calcSet('${k}',this.value)"><input type="number" id="num-${k}" step="${step * scale}" min="${min * scale}" max="${max * scale}" value="${+(c[k] * scale).toFixed(3)}" onchange="calcSet('${k}',this.value/${scale})"></div></div>`;
+  const body = h`<div class="page"><h1>Trial calculator — sample size for superiority</h1><div class="sub">Pick the endpoint, ground the placebo assumption in reviewed historical evidence, set design assumptions → read the headline number on the right, then check how fragile it is.</div>
+  <div class="calc"><div class="panel"><h3><span class="step">1</span>Endpoint</h3><div class="body">
+    <div class="field"><label>Endpoint · timepoint</label><div class="row"><select><option>EASI-75 (responder, binary)</option><option>EASI-90</option><option>EASI change from baseline (continuous)</option><option>PP-NRS ≥4-point improvement</option></select><select><option>Week 16</option><option>Week 12</option></select></div></div></div>
+    <h3><span class="step">2</span>Placebo assumption from evidence</h3><div class="body">
+    <div class="tiny muted" style="margin-bottom:6px">Tick the historical placebo arms you consider comparable. Greyed rows failed the comparability filter (timepoint, background therapy, unreviewed OCR) — you may still include them deliberately.</div>
+      <div class="tiny">${comp.map((x) => { const on = calcIncluded().has(x.study); return h`<div style="display:grid;grid-template-columns:18px 1fr auto auto;gap:2px 6px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--slate-200);${x.comparable ? '' : 'color:var(--slate-600)'}"><input type="checkbox" ${on ? 'checked' : ''} onchange="calcToggle('${x.study}')" style="width:16px;height:16px;cursor:pointer"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(x.s.name)}">${esc(x.s.name)} <span class="muted">${x.tp}</span></span><span class="mono" style="font-weight:600">${x.pct}%</span>${chip('source', 'p.' + x.page)}${x.why ? h`<span></span><span style="grid-column:2/5">${chip(on ? 'warning' : 'na', (on ? 'included despite: ' : 'not comparable: ') + x.why)}</span>` : ''}</div>`; }).join('')}</div>
+      <div class="tiny" style="margin-top:8px;display:flex;gap:8px;align-items:center"><input type="checkbox" id="pool-box" ${c.pool ? 'checked' : ''} onchange="calcPool(this.checked)" style="width:16px;height:16px;cursor:pointer"><label for="pool-box"><b>Use pooled placebo rate</b> ${p ? `→ ${p.pct.toFixed(1)}% (n-weighted, ${p.n} record${p.n === 1 ? '' : 's'}; range ${p.lo}–${p.hi}%)` : '— no records included'}</label></div></div>
+    <h3><span class="step">3</span>Design assumptions</h3><div class="body">${CALC_FIELDS.map(inp).join('')}</div></div>
+  <div><div class="panel" style="margin-bottom:16px"><h3>Sample size — what you need to enrol <span class="grow"></span><button class="btn sm" onclick="toast('Saved to W-102 §10.11 as author-supplied sample_size with assumptions + evidence links (mock)')">Save to protocol §10.11</button></h3><div class="body" id="calc-out">${calcOutHtml()}</div></div>
+  <div class="panel"><h3>Historical EASI-75 response — what other trials saw <span class="grow"></span><span class="seg">${[['study', 'By study'], ['delta', 'Treatment effect'], ['placebo', 'Placebo only']].map(([k, l]) => h`<a class="${(c.view || 'study') === k ? 'active' : ''}" onclick="state.calc.view='${k}';render()">${l}</a>`).join('')}</span></h3><div class="body">
+    <div class="howto"><b>How to read:</b> ${{ study: 'one row per trial; grey = placebo arm, coloured = active arm, bar length = % of participants reaching EASI-75. The bracket shows Δ, the treatment effect. Faded rows are excluded from your pooled placebo estimate.', delta: 'one bar per trial = active minus placebo response, in percentage points. The amber bar is the effect you entered on the left — if it is much longer than the historical bars, your assumption is optimistic.', placebo: 'placebo arms only, sorted high to low. Ticked (solid) rows are pooled into your placebo assumption; faded rows are not. A wide spread here means the placebo assumption is fragile.' }[c.view || 'study']} Click any bar to open the source page it was extracted from.</div>
+    ${histChartHtml()}
     <div class="toolbar" style="margin-top:12px"><button class="btn" onclick="toast('Endpoint explorer (exploratory): profile JAK-like → endpoint × timepoint N alongside regulatory precedent + relevance (Pilot 4b)')">Open endpoint explorer (exploratory)</button><span class="tiny muted">Profile: <b>JAK-like</b> (saved object · 2 records · editable)</span></div>
   </div></div></div></div></div>`;
-  return frame('calc', h`<b>Trial calculator</b>`, body);
+  return frame('calc', h`<b>Trial calculator</b><span class="sep">·</span><span class="muted">SRK-201 · EASI-75 · Week 16</span>`, body);
 }
 
 /* ---------- Admin ---------- */
