@@ -82,9 +82,9 @@
     <h1>SARIKA PONG</h1>
   </header>
   <input id="name" type="text" maxlength="16" placeholder="Enter your name" autocomplete="off" />
-  <div id="hud"><span>Player: <b id="who">Guest</b></span><span>Score: <b id="score">0</b></span><span>Best: <b id="best">0</b></span></div>
+  <div id="hud"><span>Player: <b id="who">Guest</b></span><span>Caught: <b id="score">0</b></span><span>Best: <b id="best">0</b></span><span>Antigen-bound: <b id="bound">10%</b></span></div>
   <canvas id="game" width="480" height="640"></canvas>
-  <div id="hint">Move the FcRn receptor with the mouse, touch, or arrow keys. Catch the gold and teal IgG antibodies, avoid the red denatured ones.</div>
+  <div id="hint">Move the FcRn receptor with the mouse, touch, or arrow keys. Catch as many free IgG antibodies as you can — catching one with a red antigen bound in its arms ends the run, and antigen-bound antibodies get more common the longer you last.</div>
 
 <script>
 const canvas = document.getElementById('game');
@@ -94,13 +94,14 @@ const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
 const nameEl = document.getElementById('name');
 const whoEl = document.getElementById('who');
+const boundEl = document.getElementById('bound');
 
 const CREAM = '#f7edea';
 const MEMBRANE_TOP = H - 74;
 const IGG_COLORS = ['#f2c14e', '#7fc8b0'];
-const DENATURED = '#e05a5a';
+const ANTIGEN = '#e05a5a';
 
-let best = Number(localStorage.getItem('sparkDodgeBest') || 0);
+let best = Number(localStorage.getItem('sarikaPongCaught') || 0);
 bestEl.textContent = best;
 
 let playerName = localStorage.getItem('sparkPongName') || '';
@@ -118,12 +119,18 @@ nameEl.addEventListener('keydown', e => {
 
 // The receptor is a cradle between two poles anchored in the membrane.
 const player = { x: W / 2, y: MEMBRANE_TOP - 46, r: 26, vx: 0 };
-let bad = [], good = [], score = 0, tick = 0, over = false;
+let antibodies = [], score = 0, tick = 0, over = false;
 const keys = new Set();
 
+// Share of spawns carrying a bound antigen; ramps with time survived.
+function boundChance() {
+  return Math.min(0.75, 0.1 + tick * 0.00012);
+}
+
 function reset() {
-  bad = []; good = []; score = 0; tick = 0; over = false;
+  antibodies = []; score = 0; tick = 0; over = false;
   player.x = W / 2; player.vx = 0;
+  scoreEl.textContent = score;
 }
 
 const typing = () => document.activeElement === nameEl;
@@ -146,36 +153,27 @@ canvas.addEventListener('mousemove', e => pointerTo(e.clientX));
 canvas.addEventListener('touchmove', e => { pointerTo(e.touches[0].clientX); e.preventDefault(); }, { passive: false });
 canvas.addEventListener('click', () => { if (over) reset(); });
 
-function antibody(color) {
+function antibody() {
   return {
     x: 24 + Math.random() * (W - 48),
     y: -28,
     r: 19,
-    vy: 0,
+    vy: 2 + Math.random() * 1.6,
     rot: (Math.random() - 0.5) * 0.6,
     vr: (Math.random() - 0.5) * 0.04,
-    color
+    color: IGG_COLORS[Math.floor(Math.random() * IGG_COLORS.length)],
+    bound: Math.random() < boundChance()
   };
 }
 
 function spawn() {
-  const difficulty = 1 + score / 400;
-  if (tick % Math.max(9, Math.round(26 / difficulty)) === 0) {
-    const a = antibody(DENATURED);
-    a.vy = 2 + Math.random() * 2 * difficulty;
-    bad.push(a);
-  }
-  if (tick % 90 === 0) {
-    const a = antibody(IGG_COLORS[Math.floor(Math.random() * IGG_COLORS.length)]);
-    a.vy = 2.2;
-    good.push(a);
-  }
+  if (tick % 24 === 0) antibodies.push(antibody());
 }
 
 // Caught when the antibody overlaps the receptor cradle.
 function caught(a) {
   const dx = Math.abs(a.x - player.x), dy = Math.abs(a.y - player.y);
-  return dx < player.r + a.r * 0.5 && dy < 22 + a.r * 0.5;
+  return dx < player.r && dy < 20;
 }
 
 function update() {
@@ -186,21 +184,22 @@ function update() {
   player.x = Math.max(player.r, Math.min(W - player.r, player.x + player.vx));
 
   spawn();
-  for (const a of bad.concat(good)) { a.y += a.vy; a.rot += a.vr; }
-  bad = bad.filter(a => a.y < H + 30);
-  good = good.filter(a => a.y < H + 30);
+  for (const a of antibodies) { a.y += a.vy; a.rot += a.vr; }
+  antibodies = antibodies.filter(a => a.y < H + 30);
 
-  good = good.filter(a => {
-    if (caught(a)) { score += 50; return false; }
-    return true;
+  let exposed = false;
+  antibodies = antibodies.filter(a => {
+    if (!caught(a)) return true;
+    if (a.bound) { exposed = true; return true; }
+    score++;
+    return false;
   });
-
-  score++;
   scoreEl.textContent = score;
+  boundEl.textContent = Math.round(boundChance() * 100) + '%';
 
-  if (bad.some(caught)) {
+  if (exposed) {
     over = true;
-    if (score > best) { best = score; localStorage.setItem('sparkDodgeBest', String(best)); bestEl.textContent = best; }
+    if (score > best) { best = score; localStorage.setItem('sarikaPongCaught', String(best)); bestEl.textContent = best; }
   }
 }
 
@@ -224,7 +223,30 @@ function drawAntibody(a) {
   ctx.moveTo(-19, -13); ctx.lineTo(-10, -4);
   ctx.moveTo(19, -13); ctx.lineTo(10, -4);
   ctx.stroke();
+
+  if (a.bound) drawAntigen();
   ctx.restore();
+}
+
+// Antigen wedged in the antibody's binding cleft, between the Fab arms.
+function drawAntigen() {
+  ctx.fillStyle = ANTIGEN;
+  ctx.strokeStyle = ANTIGEN;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const t = Math.PI / 6 + i * Math.PI / 3;
+    const px = Math.cos(t) * 7, py = -13 + Math.sin(t) * 7;
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // Contacts to both Fab arms.
+  ctx.beginPath();
+  ctx.moveTo(-6, -16); ctx.lineTo(-11, -19);
+  ctx.moveTo(6, -16); ctx.lineTo(11, -19);
+  ctx.stroke();
 }
 
 function drawMembrane() {
@@ -281,8 +303,7 @@ function draw() {
   ctx.clearRect(0, 0, W, H);
   drawMembrane();
   drawReceptor();
-  for (const a of bad) drawAntibody(a);
-  for (const a of good) drawAntibody(a);
+  for (const a of antibodies) drawAntibody(a);
 
   if (over) {
     ctx.fillStyle = 'rgba(36,3,3,0.85)';
@@ -292,7 +313,7 @@ function draw() {
     ctx.font = '600 30px system-ui, sans-serif';
     ctx.fillText('GAME OVER', W / 2, H / 2 - 14);
     ctx.font = '16px system-ui, sans-serif';
-    ctx.fillText((playerName || 'Guest') + '  ·  Score ' + score + '  ·  Best ' + best, W / 2, H / 2 + 16);
+    ctx.fillText((playerName || 'Guest') + '  ·  Caught ' + score + '  ·  Best ' + best, W / 2, H / 2 + 16);
     ctx.fillText('Click or press Space to play again', W / 2, H / 2 + 46);
   }
 }
