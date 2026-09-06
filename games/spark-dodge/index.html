@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Sarika Pong</title>
+<title>SARIKA PONG</title>
 <link rel="icon" href="data:," />
 <style>
   :root { color-scheme: dark; }
@@ -21,7 +21,17 @@
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   h1 { margin: 0; font-size: 26px; letter-spacing: 2px; font-weight: 600; }
-  #hud { display: flex; gap: 24px; font-variant-numeric: tabular-nums; font-size: 15px; opacity: .85; }
+  #hud {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 24px;
+    max-width: 96vw;
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    opacity: .85;
+  }
+  #who { max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; display: inline-block; }
   canvas {
     background: #0d1117;
     border: 1px solid #2b3442;
