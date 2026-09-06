@@ -380,12 +380,17 @@ function drawReceptor() {
   ctx.quadraticCurveTo(x, top + 18, x + 26, top - 12);
   ctx.stroke();
 
-  // Below the cradle so a caught antibody never covers it, and inset so it
-  // stays readable at either edge.
-  ctx.fillStyle = 'rgba(247,237,234,0.8)';
+  // Below the cradle so a caught antibody never covers it, on a plate so the
+  // poles don't run through the letters, and inset to stay on-canvas.
+  const label = 'FcRn receptor', labelY = top + 36;
   ctx.font = '600 11px system-ui, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('FcRn receptor', Math.max(42, Math.min(W - 42, x)), top + 36);
+  const half = ctx.measureText(label).width / 2 + 6;
+  const lx = Math.max(half, Math.min(W - half, x));
+  ctx.fillStyle = 'rgba(28,3,3,0.9)';
+  ctx.fillRect(lx - half, labelY - 10, half * 2, 15);
+  ctx.fillStyle = 'rgba(247,237,234,0.85)';
+  ctx.fillText(label, lx, labelY);
 }
 
 function draw() {
