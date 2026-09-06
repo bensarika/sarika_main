@@ -40,6 +40,11 @@ set unsupported=true and explain; do not force a Cartesian mapping.
 List series in the order their entries appear in the legend, top to bottom (or
 left to right for a horizontal legend); Python cuts each legend glyph out of the
 image in that order and searches for it, so the order is load-bearing.
+Many figures carry no legend box and instead print each group's name beside its
+own curve ("30 mg/kg", "10 mg/kg", "3 mg/kg"). Those in-plot texts are the series
+labels: list one series per printed group, label it exactly as printed, and put
+its group_bbox around the printed text so a later pass can tell which curve each
+label belongs to. Never merge two dose groups into one series.
 Describe each series marker in marker_description: shape, approximate width and
 height in pixels, whether it is filled, and its colour if the figure is not
 monochrome. A unique colour or shape is what makes a series separable.

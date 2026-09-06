@@ -254,10 +254,26 @@ def run(args):
    result={'status':'unsupported','reason':interpretation.get('reason'),'points':[]}
    write_json(out/'result.json',result);return result
   proposals=stage('proposals',lambda:geometry.analyze(out/'working.png',interpretation,out/'geometry'))
+  # A proposal is only meaningful as a reading of the figure, so it is reported in
+  # the figure's own units and against the group it was attributed to; the pixels
+  # stay alongside because they are what the screen re-measures.
+  axes={}
+  for name in ('x_axis','y_axis'):
+   try:axes[name]=geometry.Axis(interpretation.get(name),name)
+   except Exception:axes[name]=None
+  labels={s['id']:s.get('label',s['id']) for s in interpretation.get('series',[])}
+  def reading(c):
+   sid=c.get('series_id') or (c.get('possible_series') or [None])[0]
+   groups=[labels.get(s,s) for s in (c.get('possible_series') or ([sid] if sid else []))]
+   return {'candidate_id':c['candidate_id'],'series':sid,
+           'series_label':labels.get(sid),'possible_groups':groups,
+           'x':axes['x_axis'].value(c['pixel']['x']) if axes['x_axis'] else None,
+           'y':axes['y_axis'].value(c['pixel']['y']) if axes['y_axis'] else None,
+           'x_unit':interpretation.get('x_axis',{}).get('unit'),
+           'y_unit':interpretation.get('y_axis',{}).get('unit'),
+           'pixel_x':c['pixel']['x'],'pixel_y':c['pixel']['y'],'score':c.get('score')}
   progress.emit('candidates',count=len(proposals['candidates']),
-    candidates=[{'candidate_id':c['candidate_id'],'series':c.get('series_id'),
-                 'x':c['pixel']['x'],'y':c['pixel']['y'],'score':c.get('score')}
-                for c in proposals['candidates']],
+    candidates=[reading(c) for c in proposals['candidates']],
     overlay=proposals.get('overlay_path'))
   # No legend, or a legend of words only: the marks are still on the page, so a
   # search target is mined from the proposals themselves rather than dropping

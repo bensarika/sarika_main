@@ -124,6 +124,14 @@ function version(p, title, path, summary) {
   entry.append(link);
   b.prepend(entry);
 }
+function unit(name) { return name ? ' (' + name + ')' : ''; }
+
+function figure(value) {
+  if (value == null || !isFinite(value)) return 'uncalibrated';
+  const magnitude = Math.abs(value);
+  return (magnitude && (magnitude < .01 || magnitude >= 10000)) ? (+value).toExponential(2) : (+value).toPrecision(4).replace(/\.?0+$/, '');
+}
+
 function url(path) { return '/file?run=' + encodeURIComponent(runId) + '&path=' + encodeURIComponent(path); }
 
 const render = {
@@ -157,9 +165,15 @@ const render = {
   },
   candidates(p, e) {
     const t = $('table');
-    t.append(row('th', ['id', 'series', 'x', 'y', 'score']));
+    const first = e.candidates[0] || {};
+    // Read in the figure's own units; the pixels stay only as provenance.
+    t.append(row('th', ['id', 'group', 'x' + unit(first.x_unit), 'y' + unit(first.y_unit), 'pixel', 'score']));
     for (const c of e.candidates.slice(0, 300))
-      t.append(row('td', [c.candidate_id, c.series || '', Math.round(c.x), Math.round(c.y), c.score == null ? '' : (+c.score).toFixed(2)]));
+      t.append(row('td', [c.candidate_id,
+        c.series_label || (c.possible_groups || []).join(' or ') || c.series || 'unattributed',
+        figure(c.x), figure(c.y),
+        Math.round(c.pixel_x == null ? c.x : c.pixel_x) + ',' + Math.round(c.pixel_y == null ? c.y : c.pixel_y),
+        c.score == null ? '' : (+c.score).toFixed(2)]));
     const s = $('div', 'scroll'); s.append(t);
     const wrap = $('div'); wrap.append($('div', null, e.count + ' candidates'), s);
     show(p, 'candidates', wrap);
