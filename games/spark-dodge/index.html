@@ -65,6 +65,27 @@
     max-width: 60vw;
   }
   #name:focus { outline: none; border-color: var(--igg); }
+  #stage { display: flex; align-items: flex-start; justify-content: center; gap: 20px; max-width: 96vw; }
+  #board {
+    width: 240px;
+    flex: none;
+    background: #1c0303;
+    border: 1px solid var(--maroon-light);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  #board h2 { margin: 0 0 10px; font-size: 13px; letter-spacing: 2px; font-weight: 600; opacity: .9; }
+  #board ol { margin: 0; padding: 0; list-style: none; font-size: 14px; font-variant-numeric: tabular-nums; }
+  #board li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-top: 1px solid rgba(247,237,234,0.08); }
+  #board li:first-child { border-top: none; }
+  #board li b { font-weight: 600; color: var(--igg); }
+  #board .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #board .rank { opacity: .5; margin-right: 8px; }
+  #board .note { font-size: 13px; opacity: .55; }
+  @media (max-width: 860px) {
+    #stage { flex-direction: column; align-items: center; }
+    #board { width: 96vw; max-width: 480px; }
+  }
 </style>
 </head>
 <body>
@@ -83,8 +104,15 @@
   </header>
   <input id="name" type="text" maxlength="16" placeholder="Enter your name" autocomplete="off" />
   <div id="hud"><span>Player: <b id="who">Guest</b></span><span>Caught: <b id="score">0</b></span><span>Best: <b id="best">0</b></span><span>Antigen-bound: <b id="bound">10%</b></span></div>
-  <canvas id="game" width="480" height="640"></canvas>
-  <div id="hint">Move the FcRn receptor with the mouse, touch, or arrow keys. Catch as many free IgG antibodies as you can — catching one with a red antigen bound in its arms ends the run, and antigen-bound antibodies get more common the longer you last.</div>
+  <div id="stage">
+    <canvas id="game" width="480" height="640"></canvas>
+    <aside id="board">
+      <h2>SARIKA LEADERBOARD</h2>
+      <div class="note" id="boardNote">Loading…</div>
+      <ol id="boardList"></ol>
+    </aside>
+  </div>
+  <div id="hint">Move the FcRn receptor with the mouse, touch, or arrow keys. Catch as many free bispecific antibodies as you can — catching one with a red antigen bound in its arms ends the run, and antigen-bound antibodies get more common the longer you last.</div>
 
 <script>
 const canvas = document.getElementById('game');
@@ -95,11 +123,15 @@ const bestEl = document.getElementById('best');
 const nameEl = document.getElementById('name');
 const whoEl = document.getElementById('who');
 const boundEl = document.getElementById('bound');
+const boardListEl = document.getElementById('boardList');
+const boardNoteEl = document.getElementById('boardNote');
 
 const CREAM = '#f7edea';
 const MEMBRANE_TOP = H - 74;
-const IGG_COLORS = ['#f2c14e', '#7fc8b0'];
+// Each antibody is bispecific: one color per arm, drawn from a pair.
+const IGG_COLORS = ['#f2c14e', '#7fc8b0', '#e6a0c4', '#8ab6f0'];
 const ANTIGEN = '#e05a5a';
+const LEADERBOARD_URL = 'https://q37j4r35nghu5xy33kjbddk24a0rugrr.lambda-url.us-east-1.on.aws/';
 
 let best = Number(localStorage.getItem('sarikaPongCaught') || 0);
 bestEl.textContent = best;
@@ -116,6 +148,54 @@ nameEl.addEventListener('keydown', e => {
   e.stopPropagation();
   if (e.key === 'Enter') nameEl.blur();
 });
+
+function renderBoard(scores) {
+  boardListEl.textContent = '';
+  boardNoteEl.textContent = scores.length ? '' : 'No scores yet — be the first.';
+  scores.slice(0, 10).forEach((s, i) => {
+    const li = document.createElement('li');
+    const who = document.createElement('span');
+    who.className = 'who';
+    const rank = document.createElement('span');
+    rank.className = 'rank';
+    rank.textContent = (i + 1) + '.';
+    who.append(rank, s.name);
+    const val = document.createElement('b');
+    val.textContent = s.score;
+    li.append(who, val);
+    boardListEl.append(li);
+  });
+}
+
+async function callBoard(options) {
+  const res = await fetch(LEADERBOARD_URL, options);
+  if (!res.ok) throw new Error('leaderboard ' + res.status);
+  return (await res.json()).scores || [];
+}
+
+async function loadBoard() {
+  try {
+    renderBoard(await callBoard());
+  } catch {
+    boardListEl.textContent = '';
+    boardNoteEl.textContent = 'Leaderboard unavailable.';
+  }
+}
+
+async function submitScore(finalScore) {
+  if (finalScore < 1) return;
+  try {
+    renderBoard(await callBoard({
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: playerName || 'Guest', score: finalScore })
+    }));
+  } catch {
+    boardNoteEl.textContent = 'Score not submitted — leaderboard unavailable.';
+  }
+}
+
+loadBoard();
 
 // The receptor is a cradle between two poles anchored in the membrane.
 // `r` is the cradle half-width; the stroke adds half a line width on each side.
@@ -157,6 +237,7 @@ canvas.addEventListener('touchmove', e => { pointerTo(e.touches[0].clientX); e.p
 canvas.addEventListener('click', () => { if (over) reset(); });
 
 function antibody() {
+  const left = Math.floor(Math.random() * IGG_COLORS.length);
   return {
     x: 24 + Math.random() * (W - 48),
     y: -28,
@@ -164,7 +245,8 @@ function antibody() {
     vy: 2 + Math.random() * 1.6,
     rot: (Math.random() - 0.5) * 0.6,
     vr: (Math.random() - 0.5) * 0.04,
-    color: IGG_COLORS[Math.floor(Math.random() * IGG_COLORS.length)],
+    colorL: IGG_COLORS[left],
+    colorR: IGG_COLORS[(left + 1 + Math.floor(Math.random() * (IGG_COLORS.length - 1))) % IGG_COLORS.length],
     bound: Math.random() < boundChance()
   };
 }
@@ -203,6 +285,7 @@ function update() {
   if (exposed) {
     over = true;
     if (score > best) { best = score; localStorage.setItem('sarikaPongCaught', String(best)); bestEl.textContent = best; }
+    submitScore(score);
   }
 }
 
@@ -211,21 +294,22 @@ function drawAntibody(a) {
   ctx.translate(a.x, a.y);
   ctx.rotate(a.rot);
   ctx.scale(a.r / 19, a.r / 19);
-  ctx.strokeStyle = a.color;
   ctx.lineWidth = 4.5;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  ctx.beginPath();
-  // Heavy chains: V arms meeting the split stem.
-  ctx.moveTo(-14, -18); ctx.lineTo(-4, -8); ctx.lineTo(-4, 18);
-  ctx.moveTo(14, -18); ctx.lineTo(4, -8); ctx.lineTo(4, 18);
-  // Hinge bar between the two stem strands.
-  ctx.moveTo(-4, -2); ctx.lineTo(4, -2);
-  // Light chains: outer prongs parallel to each arm.
-  ctx.moveTo(-19, -13); ctx.lineTo(-10, -4);
-  ctx.moveTo(19, -13); ctx.lineTo(10, -4);
-  ctx.stroke();
+  // Bispecific: each half of the molecule carries its own specificity/color.
+  for (const [color, side] of [[a.colorL, -1], [a.colorR, 1]]) {
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    // Heavy chain: V arm down into its half of the stem.
+    ctx.moveTo(14 * side, -18); ctx.lineTo(4 * side, -8); ctx.lineTo(4 * side, 18);
+    // Half of the hinge bar joining the two stem strands.
+    ctx.moveTo(4 * side, -2); ctx.lineTo(0, -2);
+    // Light chain: outer prong parallel to the arm.
+    ctx.moveTo(19 * side, -13); ctx.lineTo(10 * side, -4);
+    ctx.stroke();
+  }
 
   if (a.bound) drawAntigen();
   ctx.restore();
