@@ -1,0 +1,725 @@
+{
+  "schema_version": 1,
+  "status": "review_required",
+  "rows": [
+    {
+      "candidate_id": "p0001",
+      "parent_candidate_id": "p0001",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 266.0,
+      "pixel_y": 422.0,
+      "x": null,
+      "y": 223.39629975318263,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": null,
+      "x_high": null,
+      "y_low": 221.29377591480508,
+      "y_high": 225.5187997814583,
+      "status": "unresolved",
+      "raw_image_support": "unsupported",
+      "reason": "red center inside topmost open-circle at time ~0 day, conc ~200 ug/mL, straddling y-axis",
+      "flags": [
+        "raw_pixel_support_unsupported",
+        "outside_calibrated_domain",
+        "unsupported_localization_cannot_be_accepted",
+        "pixel_tolerance_crosses_calibration_boundary"
+      ],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 17.152779888441813,
+        "ry": 14.64097903902145,
+        "annular_contrast": 0.5,
+        "angular_support_fraction": 0.546875,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "failure": "insufficient_isolated_ring_support",
+        "seed_pixel": {
+          "x": 266.0,
+          "y": 422.0
+        }
+      }
+    },
+    {
+      "candidate_id": "p0002",
+      "parent_candidate_id": "p0002",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 300.4617772293902,
+      "pixel_y": 513.0962541072777,
+      "x": 0.432023306100786,
+      "y": 145.2178531798541,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": 0.35797766152536276,
+      "x_high": 0.5060689506762093,
+      "y_low": 143.85111613718155,
+      "y_high": 146.59757566326547,
+      "status": "observed",
+      "raw_image_support": "supported",
+      "reason": "red center inside open-circle at time ~1 day, conc ~125 ug/mL, just above predicted line",
+      "flags": [],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 14.588584570312863,
+        "ry": 14.607085401853558,
+        "annular_contrast": 0.6023061489930239,
+        "angular_support_fraction": 0.71875,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "seed_pixel": {
+          "x": 305.0,
+          "y": 520.0
+        }
+      }
+    },
+    {
+      "candidate_id": "p0003",
+      "parent_candidate_id": "p0003",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 345.5972804233928,
+      "pixel_y": 578.4982101717832,
+      "x": 2.1030670197187855,
+      "y": 106.59195175211677,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": 2.029021375143362,
+      "x_high": 2.1771126642942087,
+      "y_low": 105.58874749230753,
+      "y_high": 107.60468750851824,
+      "status": "observed",
+      "raw_image_support": "supported",
+      "reason": "red center inside open-circle at time ~2 day, conc ~105 ug/mL, left of curve",
+      "flags": [],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 15.826281924918955,
+        "ry": 15.598765041048619,
+        "annular_contrast": 0.7965645944030502,
+        "angular_support_fraction": 0.9375,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "seed_pixel": {
+          "x": 335.0,
+          "y": 555.0
+        }
+      }
+    },
+    {
+      "candidate_id": "p0004",
+      "parent_candidate_id": "p0004",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 369.8417858115563,
+      "pixel_y": 671.2218772734246,
+      "x": 3.000667034158228,
+      "y": 68.75855492802597,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": 2.9266213895828046,
+      "x_high": 3.0747126787336514,
+      "y_low": 68.11142468912632,
+      "y_high": 69.41183358546198,
+      "status": "observed",
+      "raw_image_support": "supported",
+      "reason": "red center inside open-circle at time ~3 day, conc ~68 ug/mL, below predicted line",
+      "flags": [],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 17.752917211809915,
+        "ry": 16.719454890226373,
+        "annular_contrast": 0.7991727701146605,
+        "angular_support_fraction": 0.90625,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "seed_pixel": {
+          "x": 355.0,
+          "y": 658.0
+        }
+      }
+    },
+    {
+      "candidate_id": "p0005",
+      "parent_candidate_id": "p0005",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 423.96715513551237,
+      "pixel_y": 654.3684762202336,
+      "x": 5.004540963895811,
+      "y": 74.46176284626614,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": 4.930495319320388,
+      "x_high": 5.078586608471235,
+      "y_low": 73.76095611130741,
+      "y_high": 75.1692279829818,
+      "status": "observed",
+      "raw_image_support": "supported",
+      "reason": "red center inside open-circle at time ~5 day, conc ~73 ug/mL, above predicted line",
+      "flags": [],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 17.286857350297428,
+        "ry": 17.697638069722228,
+        "annular_contrast": 0.8900139637045213,
+        "angular_support_fraction": 0.90625,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "seed_pixel": {
+          "x": 415.0,
+          "y": 638.0
+        }
+      }
+    },
+    {
+      "candidate_id": "p0006",
+      "parent_candidate_id": "p0006",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 478.0777085342025,
+      "pixel_y": 728.2645087678629,
+      "x": 7.007866366265245,
+      "y": 52.50444602075255,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": 6.9338207216898216,
+      "x_high": 7.081912010840668,
+      "y_low": 52.0102934788286,
+      "y_high": 53.00329353204423,
+      "status": "observed",
+      "raw_image_support": "supported",
+      "reason": "red center inside open-circle at time ~7 day, conc ~54 ug/mL",
+      "flags": [],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 15.9378479938172,
+        "ry": 14.187909339248925,
+        "annular_contrast": 0.788815110604521,
+        "angular_support_fraction": 0.953125,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "seed_pixel": {
+          "x": 476.0,
+          "y": 713.0
+        }
+      }
+    },
+    {
+      "candidate_id": "p0007",
+      "parent_candidate_id": "p0007",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 560.4319777363188,
+      "pixel_y": 740.0511415104527,
+      "x": 10.056853839569559,
+      "y": 49.65849454316004,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": 9.982808194994135,
+      "x_high": 10.130899484144981,
+      "y_low": 49.1911270501877,
+      "y_high": 50.130302519337064,
+      "status": "observed",
+      "raw_image_support": "supported",
+      "reason": "red center inside open-circle at time ~10 day, conc ~50 ug/mL",
+      "flags": [],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 15.863976441398922,
+        "ry": 17.690198133307952,
+        "annular_contrast": 0.858167519536275,
+        "angular_support_fraction": 0.890625,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "seed_pixel": {
+          "x": 540.0,
+          "y": 730.0
+        }
+      }
+    },
+    {
+      "candidate_id": "p0008",
+      "parent_candidate_id": "p0008",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 668.036484525809,
+      "pixel_y": 710.9584924053925,
+      "x": 14.04067637179371,
+      "y": 56.98126001156256,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": 13.966630727218288,
+      "x_high": 14.114722016369134,
+      "y_low": 56.444973342322896,
+      "y_high": 57.522641968736195,
+      "status": "observed",
+      "raw_image_support": "supported",
+      "reason": "red center inside open-circle at time ~14 day, conc ~58 ug/mL, above predicted line",
+      "flags": [],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 15.794008036346973,
+        "ry": 15.104678374085665,
+        "annular_contrast": 0.9086329838928893,
+        "angular_support_fraction": 0.984375,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "seed_pixel": {
+          "x": 660.0,
+          "y": 701.0
+        }
+      }
+    },
+    {
+      "candidate_id": "p0009",
+      "parent_candidate_id": "p0009",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 749.7752071893024,
+      "pixel_y": 742.4043857197253,
+      "x": 17.06687457498877,
+      "y": 49.1090378680991,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": 16.992828930413346,
+      "x_high": 17.140920219564194,
+      "y_low": 48.64684165933673,
+      "y_high": 49.575625427422146,
+      "status": "observed",
+      "raw_image_support": "supported",
+      "reason": "red center inside open-circle at time ~17 day, conc ~51 ug/mL, above predicted line",
+      "flags": [],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 17.58674866254706,
+        "ry": 15.847117001961308,
+        "annular_contrast": 0.8379641235883857,
+        "angular_support_fraction": 0.984375,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "seed_pixel": {
+          "x": 730.0,
+          "y": 733.0
+        }
+      }
+    },
+    {
+      "candidate_id": "p0010",
+      "parent_candidate_id": "p0010",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 857.6899200384236,
+      "pixel_y": 834.0048808621988,
+      "x": 21.062181811031213,
+      "y": 31.84711233838593,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": 20.98813616645579,
+      "x_high": 21.136227455606637,
+      "y_low": 31.54737902611118,
+      "y_high": 32.149693432671775,
+      "status": "observed",
+      "raw_image_support": "supported",
+      "reason": "red center inside open-circle at time ~21 day, conc ~35 ug/mL",
+      "flags": [],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 17.37565955849826,
+        "ry": 15.696562833292173,
+        "annular_contrast": 0.822395395445045,
+        "angular_support_fraction": 0.921875,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "seed_pixel": {
+          "x": 832.0,
+          "y": 823.0
+        }
+      }
+    },
+    {
+      "candidate_id": "p0011",
+      "parent_candidate_id": "p0011",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 1047.183894231119,
+      "pixel_y": 878.248426537467,
+      "x": 28.07778354215958,
+      "y": 25.835739091623996,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": 28.00373789758416,
+      "x_high": 28.151829186735004,
+      "y_low": 25.592582614178934,
+      "y_high": 26.081205811587935,
+      "status": "observed",
+      "raw_image_support": "supported",
+      "reason": "red center inside open-circle at time ~28 day, conc ~27 ug/mL",
+      "flags": [],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 16.71839792596705,
+        "ry": 17.418916744682882,
+        "annular_contrast": 0.806116765361353,
+        "angular_support_fraction": 0.828125,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "seed_pixel": {
+          "x": 1022.0,
+          "y": 874.0
+        }
+      }
+    },
+    {
+      "candidate_id": "p0012",
+      "parent_candidate_id": "p0012",
+      "series_id": "s1",
+      "series_label": "Observed",
+      "pixel_x": 1234.517060463552,
+      "pixel_y": 919.6951032059576,
+      "x": 35.01338606417729,
+      "y": 21.23805679257911,
+      "x_unit": "day",
+      "y_unit": "ug/mL",
+      "x_low": 34.93934041960186,
+      "x_high": 35.08743170875271,
+      "y_low": 21.038172010527887,
+      "y_high": 21.439840690488666,
+      "status": "observed",
+      "raw_image_support": "supported",
+      "reason": "red center inside open-circle at time ~35 day, conc ~22 ug/mL, near predicted line",
+      "flags": [],
+      "localization_diagnostics": {
+        "method": "annular_contrast_axis_aligned_ellipse",
+        "rx": 17.488903360927285,
+        "ry": 16.792017245855234,
+        "annular_contrast": 0.695024572283319,
+        "angular_support_fraction": 0.859375,
+        "optimizer_success": true,
+        "sample_region_clipped": false,
+        "seed_pixel": {
+          "x": 1205.0,
+          "y": 914.0
+        }
+      }
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "interpretation_regions_unresolved",
+      "unresolved_regions": [
+        {
+          "reason": "A proposed outer tick lacks long-stroke evidence. Mapping beyond surviving ticks uses the model-indicated unbroken axis; requires review."
+        }
+      ]
+    }
+  ],
+  "axis_agreement": {
+    "x_axis": {
+      "accepted": true,
+      "reason": "within_tolerance",
+      "primary_unit": "day",
+      "review_unit": "day",
+      "canonical_unit": "day",
+      "unit_conversion_performed": false,
+      "comparison_space": "data",
+      "tolerance": 0.19973812624220408,
+      "outer_endpoint_comparison_tolerance_pixels": 2.0,
+      "primary_tick_fit": [
+        {
+          "pixel_min": 289.0,
+          "pixel_max": 1368.0,
+          "anchor_count": 5,
+          "slope_in_calibration_space": 0.0370228222877116,
+          "max_residual_pixels": 2.000000000000023,
+          "residual_limit_pixels": 2.0
+        }
+      ],
+      "review_tick_fit": [
+        {
+          "pixel_min": 289.0,
+          "pixel_max": 1368.0,
+          "anchor_count": 5,
+          "slope_in_calibration_space": 0.0370228222877116,
+          "max_residual_pixels": 2.000000000000023,
+          "residual_limit_pixels": 2.0
+        }
+      ],
+      "max_difference": 0.0,
+      "domain_mismatch_pixels": [],
+      "checks": [
+        {
+          "pixel": 289.0,
+          "primary_value": 0.007675964635733834,
+          "review_value": 0.007675964635733834,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 300.4617772293902,
+          "primary_value": 0.432023306100786,
+          "review_value": 0.432023306100786,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 345.5972804233928,
+          "primary_value": 2.1030670197187855,
+          "review_value": 2.1030670197187855,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 369.8417858115563,
+          "primary_value": 3.000667034158228,
+          "review_value": 3.000667034158228,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 423.96715513551237,
+          "primary_value": 5.004540963895811,
+          "review_value": 5.004540963895811,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 478.0777085342025,
+          "primary_value": 7.007866366265245,
+          "review_value": 7.007866366265245,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 557.0,
+          "primary_value": 9.929792337742445,
+          "review_value": 9.929792337742445,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 560.4319777363188,
+          "primary_value": 10.056853839569559,
+          "review_value": 10.056853839569559,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 668.036484525809,
+          "primary_value": 14.04067637179371,
+          "review_value": 14.04067637179371,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 749.7752071893024,
+          "primary_value": 17.06687457498877,
+          "review_value": 17.06687457498877,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 828.5,
+          "primary_value": 19.981488588856145,
+          "review_value": 19.981488588856145,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 831.0,
+          "primary_value": 20.074045644575424,
+          "review_value": 20.074045644575424,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 857.6899200384236,
+          "primary_value": 21.062181811031213,
+          "review_value": 21.062181811031213,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 1047.183894231119,
+          "primary_value": 28.07778354215958,
+          "review_value": 28.07778354215958,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 1100.0,
+          "primary_value": 30.03318483996984,
+          "review_value": 30.03318483996984,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 1234.517060463552,
+          "primary_value": 35.01338606417729,
+          "review_value": 35.01338606417729,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 1368.0,
+          "primary_value": 39.95530121307655,
+          "review_value": 39.95530121307655,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        }
+      ]
+    },
+    "y_axis": {
+      "accepted": true,
+      "reason": "within_tolerance",
+      "primary_unit": "ug/mL",
+      "review_unit": "ug/mL",
+      "canonical_unit": "ug/mL",
+      "unit_conversion_performed": false,
+      "comparison_space": "log10(data)",
+      "tolerance": 0.01,
+      "outer_endpoint_comparison_tolerance_pixels": 2.0,
+      "primary_tick_fit": [
+        {
+          "pixel_min": 592.0,
+          "pixel_max": 1079.0,
+          "anchor_count": 2,
+          "slope_in_calibration_space": -0.002053388090349076,
+          "max_residual_pixels": 0.0,
+          "residual_limit_pixels": 2.0
+        }
+      ],
+      "review_tick_fit": [
+        {
+          "pixel_min": 592.0,
+          "pixel_max": 1079.0,
+          "anchor_count": 2,
+          "slope_in_calibration_space": -0.002053388090349076,
+          "max_residual_pixels": 0.0,
+          "residual_limit_pixels": 2.0
+        }
+      ],
+      "max_difference": 0.0,
+      "domain_mismatch_pixels": [],
+      "checks": [
+        {
+          "pixel": 422.0,
+          "primary_value": 223.39629975318263,
+          "review_value": 223.39629975318263,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 513.0962541072777,
+          "primary_value": 145.2178531798541,
+          "review_value": 145.2178531798541,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 578.4982101717832,
+          "primary_value": 106.59195175211677,
+          "review_value": 106.59195175211677,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 592.0,
+          "primary_value": 100.0,
+          "review_value": 100.0,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 654.3684762202336,
+          "primary_value": 74.46176284626614,
+          "review_value": 74.46176284626614,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 671.2218772734246,
+          "primary_value": 68.75855492802597,
+          "review_value": 68.75855492802597,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 710.9584924053925,
+          "primary_value": 56.98126001156256,
+          "review_value": 56.98126001156256,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 728.2645087678629,
+          "primary_value": 52.50444602075255,
+          "review_value": 52.50444602075255,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 740.0511415104527,
+          "primary_value": 49.65849454316004,
+          "review_value": 49.65849454316004,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 742.4043857197253,
+          "primary_value": 49.1090378680991,
+          "review_value": 49.1090378680991,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 834.0048808621988,
+          "primary_value": 31.84711233838593,
+          "review_value": 31.84711233838593,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 835.5,
+          "primary_value": 31.622776601683793,
+          "review_value": 31.622776601683793,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 878.248426537467,
+          "primary_value": 25.835739091623996,
+          "review_value": 25.835739091623996,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 919.6951032059576,
+          "primary_value": 21.23805679257911,
+          "review_value": 21.23805679257911,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        },
+        {
+          "pixel": 1079.0,
+          "primary_value": 10.0,
+          "review_value": 10.0,
+          "difference_in_calibration_space": 0.0,
+          "outer_endpoint_tolerance_used": false
+        }
+      ]
+    }
+  },
+  "uncertainty_note": "Bounds propagate an assumed pixel tolerance through fixed axis calibrations; they are not confidence intervals and exclude axis, association, and observation-count uncertainty.",
+  "csv_path": "/Users/benjamin/Documents/Codex/2026-09-06/ise/work/muse_spark_1_3/coarse_runs/figure12/final/observed.csv",
+  "all_candidates_csv_path": "/Users/benjamin/Documents/Codex/2026-09-06/ise/work/muse_spark_1_3/coarse_runs/figure12/final/all_candidates.csv",
+  "json_path": "/Users/benjamin/Documents/Codex/2026-09-06/ise/work/muse_spark_1_3/coarse_runs/figure12/final/result.json",
+  "overlay_path": "/Users/benjamin/Documents/Codex/2026-09-06/ise/work/muse_spark_1_3/coarse_runs/figure12/final/final_overlay.png",
+  "original_image_path": "/Users/benjamin/Documents/Codex/2026-09-06/ise/work/muse_spark_1_3/coarse_runs/figure12/geometry/original.png",
+  "counts": {
+    "observed": 11,
+    "reject": 0,
+    "unresolved": 1
+  }
+}
