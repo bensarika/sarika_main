@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spark Dodge</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: radial-gradient(circle at 50% 20%, #1b2735, #090a0f 70%);
+    color: #e8ecf1;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h1 { margin: 0; font-size: 26px; letter-spacing: 2px; font-weight: 600; }
+  #hud { display: flex; gap: 24px; font-variant-numeric: tabular-nums; font-size: 15px; opacity: .85; }
+  canvas {
+    background: #0d1117;
+    border: 1px solid #2b3442;
+    border-radius: 12px;
+    touch-action: none;
+    max-width: 96vw;
+    height: auto;
+  }
+  #hint { font-size: 13px; opacity: .6; }
+</style>
+</head>
+<body>
+  <h1>SPARK DODGE</h1>
+  <div id="hud"><span>Score: <b id="score">0</b></span><span>Best: <b id="best">0</b></span></div>
+  <canvas id="game" width="480" height="640"></canvas>
+  <div id="hint">Move with the mouse, touch, or arrow keys. Dodge the red sparks, collect the green orbs.</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+
+let best = Number(localStorage.getItem('sparkDodgeBest') || 0);
+bestEl.textContent = best;
+
+const player = { x: W / 2, y: H - 60, r: 12, vx: 0 };
+let sparks = [], orbs = [], score = 0, tick = 0, over = false;
+const keys = new Set();
+
+function reset() {
+  sparks = []; orbs = []; score = 0; tick = 0; over = false;
+  player.x = W / 2; player.vx = 0;
+}
+
+addEventListener('keydown', e => {
+  keys.add(e.key);
+  if (over && (e.key === ' ' || e.key === 'Enter')) reset();
+  if (e.key.startsWith('Arrow')) e.preventDefault();
+});
+addEventListener('keyup', e => keys.delete(e.key));
+
+function pointerTo(clientX) {
+  const rect = canvas.getBoundingClientRect();
+  player.x = (clientX - rect.left) * (W / rect.width);
+}
+canvas.addEventListener('mousemove', e => pointerTo(e.clientX));
+canvas.addEventListener('touchmove', e => { pointerTo(e.touches[0].clientX); e.preventDefault(); }, { passive: false });
+canvas.addEventListener('click', () => { if (over) reset(); });
+
+function spawn() {
+  const difficulty = 1 + score / 400;
+  if (tick % Math.max(9, Math.round(26 / difficulty)) === 0) {
+    sparks.push({ x: Math.random() * W, y: -10, r: 6 + Math.random() * 5, vy: 2 + Math.random() * 2 * difficulty });
+  }
+  if (tick % 90 === 0) {
+    orbs.push({ x: 20 + Math.random() * (W - 40), y: -10, r: 8, vy: 2.2 });
+  }
+}
+
+function circlesHit(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y;
+  return Math.hypot(dx, dy) < a.r + b.r;
+}
+
+function update() {
+  tick++;
+  if (keys.has('ArrowLeft')) player.vx -= 0.8;
+  if (keys.has('ArrowRight')) player.vx += 0.8;
+  player.vx *= 0.86;
+  player.x = Math.max(player.r, Math.min(W - player.r, player.x + player.vx));
+
+  spawn();
+  for (const s of sparks) s.y += s.vy;
+  for (const o of orbs) o.y += o.vy;
+  sparks = sparks.filter(s => s.y < H + 20);
+  orbs = orbs.filter(o => o.y < H + 20);
+
+  for (const s of sparks) if (circlesHit(s, player)) {
+    over = true;
+    if (score > best) { best = score; localStorage.setItem('sparkDodgeBest', String(best)); bestEl.textContent = best; }
+  }
+  orbs = orbs.filter(o => {
+    if (circlesHit(o, player)) { score += 50; return false; }
+    return true;
+  });
+
+  score++;
+  scoreEl.textContent = score;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.fillStyle = '#7fd1ff';
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#ff5c5c';
+  for (const s of sparks) {
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#5cffb1';
+  for (const o of orbs) {
+    ctx.beginPath();
+    ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (over) {
+    ctx.fillStyle = 'rgba(9,10,15,0.78)';
+    ctx.fillRect(0, H / 2 - 70, W, 140);
+    ctx.fillStyle = '#e8ecf1';
+    ctx.textAlign = 'center';
+    ctx.font = '600 30px system-ui, sans-serif';
+    ctx.fillText('GAME OVER', W / 2, H / 2 - 14);
+    ctx.font = '16px system-ui, sans-serif';
+    ctx.fillText('Score ' + score + '  ·  Best ' + best, W / 2, H / 2 + 16);
+    ctx.fillText('Click or press Space to play again', W / 2, H / 2 + 46);
+  }
+}
+
+function loop() {
+  if (!over) update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
