@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -55,7 +56,48 @@ def stub_server(responses):
         thread.join(timeout=2)
 
 
+@contextmanager
+def dribbling_server(stop):
+    """Sends headers, then one byte at a time until the client gives up."""
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            while not stop.is_set():
+                try:
+                    self.wfile.write(b" ")
+                    self.wfile.flush()
+                except OSError:
+                    return
+                stop.wait(.05)
+        def log_message(self, *args):
+            pass
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}/v1"
+    finally:
+        stop.set()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
 class ProviderTests(unittest.TestCase):
+    def test_timeout_bounds_the_whole_response_not_just_the_socket(self):
+        stop = threading.Event()
+        self.addCleanup(stop.set)
+        with dribbling_server(stop) as url:
+            provider = Provider(ModelConfig("arbitrary/user-model", url, timeout_s=1), self.root)
+            started = time.monotonic()
+            with self.assertRaises(ProviderError) as caught:
+                provider.complete("interpret", "prompt")
+            self.assertLess(time.monotonic() - started, 20)
+        self.assertIn("Transport failure", str(caught.exception))
+
     def test_reasoning_effort_is_sent_and_changes_cache_identity(self):
         with tempfile.TemporaryDirectory() as directory:
             with stub_server([(200, completion()), (200, completion())]) as (url, calls):

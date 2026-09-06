@@ -111,6 +111,32 @@ def _nonnegative(value: Any, name: str) -> None:
         raise ValueError(f"{name} must be a finite nonnegative number")
 
 
+def _read_before(handle, deadline: float) -> bytes:
+    """Read a response body under a wall-clock deadline.
+
+    A socket timeout only bounds the wait between packets, so an endpoint that
+    dribbles bytes, or holds a connection open after the headers, can outlive
+    `timeout_s` indefinitely: `read` keeps looping while bytes keep arriving.
+    Reading one underlying chunk at a time makes the deadline enforceable.
+    """
+    limit = 16 * 1024 * 1024 + 1
+    try:
+        chunked = handle.read1
+    except AttributeError:
+        return handle.read(limit)
+    chunks: list[bytes] = []
+    total = 0
+    while total < limit:
+        if time.monotonic() >= deadline:
+            raise TimeoutError("response exceeded the request deadline")
+        chunk = chunked(limit - total)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        total += len(chunk)
+    return b"".join(chunks)
+
+
 @dataclass(frozen=True)
 class ModelConfig:
     name: str
@@ -424,13 +450,14 @@ class Provider(_Journal):
             status, raw_text, response, result, failure, transient = None, None, None, None, None, False
             try:
                 req = request.Request(self.config.endpoint, data=encoded, headers=headers, method="POST")
+                deadline = started + self.config.timeout_s
                 try:
                     with self._opener.open(req, timeout=self.config.timeout_s) as handle:
                         status = handle.status
-                        raw_bytes = handle.read(16 * 1024 * 1024 + 1)
+                        raw_bytes = _read_before(handle, deadline)
                 except error.HTTPError as exc:
                     status = exc.code
-                    raw_bytes = exc.read(16 * 1024 * 1024 + 1)
+                    raw_bytes = _read_before(exc, deadline)
                 if len(raw_bytes) > 16 * 1024 * 1024:
                     raise InvalidResponse("HTTP response exceeds 16 MiB limit")
                 raw_text = raw_bytes.decode("utf-8", errors="replace")
