@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from chart_harness.geometry import Axis, _axis_agreement, analyze, finalize
+from chart_harness.geometry import Axis, _axis_agreement, _overlay, _reading, analyze, finalize
 
 
 class GeometryTests(unittest.TestCase):
@@ -314,6 +314,19 @@ class GeometryTests(unittest.TestCase):
         result = finalize(self.image, self.interpretation, review=review, proposals=proposals, outdir=self.root / "final")
         self.assertFalse(result["axis_agreement"]["x_axis"]["accepted"])
         self.assertEqual(result["status"], "review_required")
+
+    def test_an_overlay_says_whose_reading_it_is_and_what_each_mark_was_read_as(self):
+        blank = Image.new("RGB", (200, 160), "white")
+        candidates = [{"candidate_id": "c1", "pixel": {"x": 100., "y": 80.}}]
+        rows = [{"candidate_id": "c1", "series_label": "Drug", "x": 9., "y": 31.6, "status": "observed"}]
+        plain, titled = self.root / "plain.png", self.root / "titled.png"
+        _overlay(blank, candidates, plain, rows)
+        _overlay(blank, candidates, titled, rows, label="grok", stage="reviewed")
+        with Image.open(plain) as a, Image.open(titled) as b:
+            self.assertNotEqual(a.tobytes(), b.tobytes())
+            self.assertNotEqual(blank.crop((0, 0, 200, 30)).tobytes(), b.crop((0, 0, 200, 30)).tobytes())
+        self.assertEqual("9,31.6", _reading(rows[0]))
+        self.assertIsNone(_reading({"candidate_id": "c1", "x": None, "y": 3.}))
 
     def test_image_identity_is_enforced(self):
         p = analyze(self.image, self.interpretation, self.root / "proposal")

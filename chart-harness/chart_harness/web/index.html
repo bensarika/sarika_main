@@ -1,0 +1,257 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>chart harness — live</title>
+<style>
+ :root{color-scheme:dark}
+ body{margin:0;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0e1013;color:#dfe3e8}
+ header{padding:12px 16px;border-bottom:1px solid #23262c;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+ h1{font-size:14px;margin:0 12px 0 0;font-weight:600;letter-spacing:.04em}
+ input,button{font:inherit;background:#171a1f;color:#dfe3e8;border:1px solid #2b2f36;border-radius:4px;padding:5px 8px}
+ button{cursor:pointer;background:#1f6feb;border-color:#1f6feb;color:#fff}
+ button:disabled{opacity:.5;cursor:default}
+ #sides{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px;padding:12px}
+ section{border:1px solid #23262c;border-radius:6px;background:#12151a;min-width:0}
+ section>h2{margin:0;padding:8px 12px;font-size:13px;border-bottom:1px solid #23262c;display:flex;justify-content:space-between;gap:8px}
+ .status{font-weight:400;color:#8b949e}
+ .block{padding:8px 12px;border-bottom:1px solid #1c1f25}
+ .block>b{display:block;color:#8b949e;font-weight:500;margin-bottom:4px;text-transform:lowercase;letter-spacing:.04em}
+ .stages{display:flex;flex-wrap:wrap;gap:4px}
+ .chip{border:1px solid #2b2f36;border-radius:10px;padding:1px 8px;font-size:11px;color:#9aa4b1}
+ .chip.running{border-color:#d29922;color:#e3b341}
+ .chip.done{border-color:#238636;color:#56d364}
+ .chip.reused{border-color:#30363d;color:#6e7681}
+ .chip.fail{border-color:#da3633;color:#f85149}
+ .glyphs{display:flex;gap:10px;flex-wrap:wrap}
+ .glyph{text-align:center;font-size:10px;color:#9aa4b1}
+ .glyph img{display:block;background:#fff;border:1px solid #2b2f36;image-rendering:pixelated;max-width:72px;max-height:72px}
+ table{width:100%;border-collapse:collapse;font-size:11px}
+ td,th{text-align:left;padding:2px 6px 2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ th{color:#8b949e;font-weight:500}
+ tr.pass td:first-child{color:#56d364}
+ tr.fail td:first-child{color:#f85149}
+ .scroll{max-height:240px;overflow:auto}
+ img.shot{max-width:100%;border:1px solid #23262c;background:#fff}
+ .bar{height:4px;background:#1c1f25;overflow:hidden;position:relative}
+ .bar i{position:absolute;inset:0;width:35%;background:linear-gradient(90deg,#1f6feb00,#1f6feb,#1f6feb00);animation:slide 1.4s linear infinite}
+ .bar.done i{animation:none;width:100%;background:#238636}
+ .bar.fail i{animation:none;width:100%;background:#da3633}
+ @keyframes slide{from{left:-35%}to{left:100%}}
+ .elapsed{padding:3px 12px;font-size:11px;color:#8b949e;display:flex;justify-content:space-between}
+ .say{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #1c1f25}
+ .say input{flex:1;min-width:0}
+ .say select{background:#171a1f;color:#dfe3e8;border:1px solid #2b2f36;border-radius:4px;font:inherit}
+ .notes{padding:0 12px 8px;font-size:11px;color:#9aa4b1}
+ pre{margin:0;white-space:pre-wrap;color:#adbac7;font-size:11px}
+ .verdict{font-weight:600}
+ .sound{color:#56d364}.needs_another_pass{color:#e3b341}.unusable{color:#f85149}
+ footer{padding:0 12px 24px}
+</style>
+<header>
+ <h1>chart harness</h1>
+ <input type="file" id="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.webp,.bmp">
+ <input id="query" size="52">
+ <input id="page" type="number" placeholder="pdf page" style="width:92px">
+ <button id="go">read it</button>
+ <span class="status" id="banner"></span>
+</header>
+<div id="sides"></div>
+<footer><section id="adjudication" hidden><h2>adjudication <span class="status" id="agree"></span></h2></section></footer>
+<script>
+const $ = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x !== undefined) e.textContent = x; return e; };
+let runId = null;
+const panels = new Map();
+
+fetch('/config').then(r => r.json()).then(c => { query.value = c.query; });
+
+function panel(side) {
+  if (panels.has(side)) return panels.get(side);
+  const root = $('section');
+  const head = $('h2'); head.append($('span', null, side));
+  const status = $('span', 'status', 'starting');
+  head.append(status); root.append(head);
+  const bar = $('div', 'bar'); bar.append($('i')); root.append(bar);
+  const elapsed = $('div', 'elapsed'); const clock = $('span', null, '0s');
+  const calls = $('span', null, ''); elapsed.append(clock, calls); root.append(elapsed);
+  const blocks = {};
+  for (const [key, title] of [['stages', 'stages'], ['legend', 'legend'], ['glyphs', 'legend glyphs (templates python searches for)'],
+       ['candidates', 'candidates proposed'], ['screen', 'pixel screen'], ['judgment', 'judged by the other reader'],
+       ['iteration', 'second pass'], ['overlay', 'annotated versions (newest first)'], ['result', 'result']]) {
+    const b = $('div', 'block'); b.hidden = true; b.append($('b', null, title));
+    const body = $('div'); b.append(body); blocks[key] = body; blocks[key].box = b; root.append(b);
+  }
+  const say = $('div', 'say');
+  const target = document.createElement('select');
+  for (const [value, text] of [['model', 'tell ' + side], ['harness', 'about the harness']]) {
+    const option = document.createElement('option'); option.value = value; option.textContent = text;
+    target.append(option);
+  }
+  const text = document.createElement('input');
+  text.placeholder = 'e.g. the early cluster has six points, not three';
+  const send = $('button', null, 'send');
+  say.append(target, text, send); root.append(say);
+  const notes = $('div', 'notes'); root.append(notes);
+  send.onclick = async () => {
+    if (!text.value.trim() || !runId) return;
+    const q = new URLSearchParams({ run: runId, side: side, target: target.value });
+    const posted = await fetch('/notes?' + q, { method: 'POST', body: text.value });
+    if (posted.ok) text.value = '';
+  };
+  text.onkeydown = event => { if (event.key === 'Enter') send.onclick(); };
+
+  sides.append(root);
+  const started = Date.now();
+  const p = { root, status, blocks, chips: new Map(), bar, notes, stages: 0 };
+  p.tick = setInterval(() => { clock.textContent = Math.round((Date.now() - started) / 1000) + 's'; }, 1000);
+  p.finish = state => { clearInterval(p.tick); bar.className = 'bar ' + state; };
+  p.counted = () => { calls.textContent = p.stages + ' stages'; };
+  panels.set(side, p);
+  return p;
+}
+
+function show(p, key, node) { const b = p.blocks[key]; b.box.hidden = false; b.replaceChildren(node); }
+
+function version(p, title, path, summary) {
+  const b = p.blocks.overlay; b.box.hidden = false;
+  const seen = p.versions || (p.versions = new Set());
+  const key = title + '|' + path + '|' + summary;
+  if (seen.has(key)) return;
+  seen.add(key);
+  const entry = $('div', 'block');
+  entry.append($('b', null, `v${seen.size} · ${title} · ${new Date().toLocaleTimeString()}`));
+  entry.append($('div', null, summary));
+  const image = document.createElement('img'); image.className = 'shot'; image.src = url(path);
+  const link = document.createElement('a'); link.href = image.src; link.target = '_blank'; link.append(image);
+  entry.append(link);
+  b.prepend(entry);
+}
+function url(path) { return '/file?run=' + encodeURIComponent(runId) + '&path=' + encodeURIComponent(path); }
+
+const render = {
+  stage(p, e) {
+    const box = p.blocks.stages; box.box.hidden = false;
+    let chip = p.chips.get(e.stage);
+    if (!chip) { chip = $('span', 'chip'); p.chips.set(e.stage, chip); box.append(chip); }
+    chip.className = 'chip ' + ({ started: 'running', finished: 'done', reused: 'reused' }[e.state] || '');
+    chip.textContent = e.stage + (e.seconds ? ' ' + e.seconds + 's' : '');
+    p.stages = p.chips.size; p.counted();
+    p.status.textContent = e.state === 'started' ? e.stage + '…' : p.status.textContent;
+  },
+  panel(p, e) { p.status.textContent = 'panel ' + e.label + ' ' + e.state + (e.status ? ' — ' + e.status : ''); },
+  reorient(p, e) { p.status.textContent = 'sheet printed sideways — rotating ' + e.clockwise + '°'; },
+  legend(p, e) {
+    const t = $('table');
+    t.append(row('th', ['series', 'marker', 'described as']));
+    for (const s of e.series) t.append(row('td', [s.label || s.id, s.marker || '', s.marker_description || s.colour || '']));
+    show(p, 'legend', t);
+  },
+  legend_glyphs(p, e) {
+    const wrap = $('div', 'glyphs');
+    if (!e.glyphs.length) wrap.append($('span', null, e.reason || 'none extracted'));
+    for (const g of e.glyphs) {
+      const d = $('div', 'glyph'); const i = document.createElement('img');
+      i.src = url(g.template_path); d.append(i, $('div', null, g.label));
+      d.append($('div', null, g.width + '×' + g.height + 'px'));
+      wrap.append(d);
+    }
+    show(p, 'glyphs', wrap);
+  },
+  candidates(p, e) {
+    const t = $('table');
+    t.append(row('th', ['id', 'series', 'x', 'y', 'score']));
+    for (const c of e.candidates.slice(0, 300))
+      t.append(row('td', [c.candidate_id, c.series || '', Math.round(c.x), Math.round(c.y), c.score == null ? '' : (+c.score).toFixed(2)]));
+    const s = $('div', 'scroll'); s.append(t);
+    const wrap = $('div'); wrap.append($('div', null, e.count + ' candidates'), s);
+    show(p, 'candidates', wrap);
+    if (e.overlay) version(p, 'proposed points', e.overlay, e.count + ' candidates proposed');
+  },
+  screen(p, e) {
+    const t = $('table');
+    t.append(row('th', ['', 'id', 'series', 'why', 'correction']));
+    for (const r of e.results) {
+      const tr = row('td', [r.passed ? 'pass' : 'fail', r.candidate_id, r.series_id || '',
+        r.reason || '', (r.correction && r.correction.advice) || (r.corrected ? 'snapped' : '')]);
+      tr.className = r.passed ? 'pass' : 'fail'; t.append(tr);
+    }
+    const s = $('div', 'scroll'); s.append(t);
+    const wrap = $('div');
+    p.screened = `${e.checked} checked · ${e.failed} failed the source pixels · ${e.corrected} moved by python`;
+    wrap.append($('div', null, p.screened), s);
+    show(p, 'screen', wrap);
+  },
+  judgment(p, e) {
+    const wrap = $('div');
+    wrap.append($('div', 'verdict ' + e.verdict, e.verdict + ' — judged by ' + e.judged_by));
+    if (e.worst_problem) wrap.append($('div', null, e.worst_problem));
+    const t = $('table'); t.append(row('th', ['issue', 'series', 'fix']));
+    for (const f of e.findings) t.append(row('td', [f.issue || '', f.series || '', f.fix || '']));
+    wrap.append(t);
+    wrap.append($('div', null, e.iterate ? 'another pass: ' + e.reasons.map(r => r.code).join(', ') : 'no second pass'));
+    show(p, 'judgment', wrap);
+  },
+  iteration(p, e) {
+    const wrap = $('div');
+    wrap.append($('div', null, e.state === 'started' ? 'running with corrections' : 'finished — ' + e.status));
+    if (e.feedback) wrap.append(Object.assign(document.createElement('pre'), { textContent: e.feedback }));
+    show(p, 'iteration', wrap);
+  },
+  result(p, e) {
+    const wrap = $('div');
+    const counts = Object.entries(e.counts || {}).map(([k, v]) => k + ' ' + v).join(' · ');
+    wrap.append($('div', null, e.status + (counts ? ' — ' + counts : '')));
+    for (const r of (e.unresolved_regions || [])) wrap.append($('div', null, 'unresolved: ' + (r.reason || JSON.stringify(r))));
+    show(p, 'result', wrap);
+    if (e.overlay) version(p, 'reviewed reading', e.overlay,
+      [e.status, counts, p.screened].filter(Boolean).join(' — '));
+    p.status.textContent = e.status;
+  },
+  note(p, e) {
+    p.notes.append($('div', null, (e.target === 'model' ? 'to the reader: ' : 'about the harness: ') + e.text));
+  },
+  failed(p, e) {
+    p.status.textContent = 'failed';
+    p.finish('fail');
+    const pre = document.createElement('pre'); pre.textContent = e.error + '\n' + (e.detail || '');
+    show(p, 'result', pre);
+  },
+};
+
+function row(cell, values) {
+  const tr = document.createElement('tr');
+  for (const v of values) { const c = document.createElement(cell); c.textContent = v; tr.append(c); }
+  return tr;
+}
+
+function handle(e) {
+  if (e.kind === 'run_started') { banner.textContent = 'run ' + e.run; e.sides.forEach(panel); return; }
+  if (e.kind === 'run_finished') {
+    banner.textContent = 'done — ' + JSON.stringify(e.statuses);
+    for (const p of panels.values()) if (p.bar.className === 'bar') p.finish('done');
+    return;
+  }
+  if (e.kind === 'duel_report') {
+    adjudication.hidden = false;
+    agree.textContent = (e.agrees ? 'readings agree (evidence, not proof)' : 'readings disagree — see duel_report.json')
+      + (e.iterated.length ? ' · second pass: ' + e.iterated.join(', ') : '');
+    return;
+  }
+  if (!e.side || e.side === 'both') { if (e.kind === 'stage') banner.textContent = 'cross-judging: ' + e.stage + ' ' + e.state; return; }
+  const p = panel(e.side);
+  if (render[e.kind]) render[e.kind](p, e);
+}
+
+go.onclick = async () => {
+  const f = file.files[0];
+  if (!f) { banner.textContent = 'choose a file first'; return; }
+  go.disabled = true; sides.replaceChildren(); panels.clear(); adjudication.hidden = true;
+  const q = new URLSearchParams({ filename: f.name, query: query.value });
+  if (page.value) q.set('page', page.value);
+  const started = await fetch('/runs?' + q, { method: 'POST', body: f });
+  const body = await started.json();
+  if (!started.ok) { banner.textContent = body.error; go.disabled = false; return; }
+  runId = body.run;
+  const stream = new EventSource('/events?run=' + encodeURIComponent(runId));
+  stream.onmessage = m => { const e = JSON.parse(m.data); handle(e); if (e.kind === 'run_finished') { stream.close(); go.disabled = false; } };
+  stream.onerror = () => { go.disabled = false; };
+};
+</script>

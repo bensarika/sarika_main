@@ -404,13 +404,32 @@ def _write_json(path, data):
     Path(path).write_text(json.dumps(data, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
-def _overlay(image, candidates, path, rows=None):
+def _reading(row):
+    """What this mark was deduced to be, in the figure's own units."""
+    if not row or row.get("x") is None or row.get("y") is None:
+        return None
+    def number(value):
+        magnitude = abs(value)
+        if magnitude and (magnitude < .01 or magnitude >= 10000):
+            return f"{value:.2g}"
+        return f"{value:.4g}"
+    return f"{number(row['x'])},{number(row['y'])}"
+
+
+def _overlay(image, candidates, path, rows=None, label=None, stage=None):
     canvas = image.copy()
     draw = ImageDraw.Draw(canvas)
     try:
         font = ImageFont.truetype("DejaVuSans.ttf", max(12, min(20, image.width // 90)))
     except OSError:
         font = ImageFont.load_default()
+    if label:
+        # Overlays from different readers are compared side by side, so each one
+        # says whose reading it is, and which pass of that reading.
+        title = label.upper() + " ANNOTATION" + (" — " + stage.upper() if stage else "")
+        box = draw.textbbox((8, 8), title, font=font)
+        draw.rectangle((box[0] - 4, box[1] - 4, box[2] + 4, box[3] + 4), fill="#111111")
+        draw.text((8, 8), title, fill="#ffffff", font=font)
     row_by_id = {r["candidate_id"]: r for r in rows or []}
     for c in candidates:
         x, y = c["pixel"]["x"], c["pixel"]["y"]
@@ -418,7 +437,9 @@ def _overlay(image, candidates, path, rows=None):
         color = "#13a34a" if row and row["status"] == "observed" else "#e63563"
         radius = 7
         draw.ellipse((x - radius, y - radius, x + radius, y + radius), outline=color, width=2)
-        text = c["candidate_id"]
+        reading = _reading(row)
+        series = (row or {}).get("series_label") or (row or {}).get("series_id")
+        text = " ".join(part for part in (c["candidate_id"], series, reading) if part)
         tx, ty = min(max(0, x + 8), max(0, image.width - 60)), max(0, y - 16)
         rect = draw.textbbox((tx, ty), text, font=font)
         draw.rectangle(rect, fill="white")
@@ -504,7 +525,8 @@ def analyze(image_path, interpretation: dict, outdir) -> dict:
         proposals["diagnostics"].append({"code": "no_resolvable_observation_candidates"})
     elif any(c["support"] != "supported" or len(c["possible_series"]) > 1 for c in merged) or proposals["diagnostics"]:
         proposals["status"] = "review_required"
-    _overlay(image, merged, proposals["overlay_path"])
+    _overlay(image, merged, proposals["overlay_path"], label=interpretation.get("overlay_label"),
+             stage="proposals")
     _write_json(proposals["proposals_path"], proposals)
     return proposals
 
@@ -743,6 +765,7 @@ def finalize(image_path, interpretation, proposals, review, outdir) -> dict:
             for row in rows:
                 writer.writerow({**row, "flags": ";".join(row["flags"])})
     result["counts"] = {role: sum(row["status"] == role for row in result["rows"]) for role in ("observed", "reject", "unresolved")}
-    _overlay(image, candidates, result["overlay_path"], result["rows"])
+    _overlay(image, candidates, result["overlay_path"], result["rows"],
+             label=interpretation.get("overlay_label"), stage="reviewed")
     _write_json(result["json_path"], result)
     return result
