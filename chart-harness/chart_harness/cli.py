@@ -11,7 +11,8 @@ import numpy as np
 from PIL import Image
 from .ingest import inspect_document, render_page, crop_image
 from . import geometry
-from .prompts import interpret_prompt,review_prompt,INTERPRET_SCHEMA,REVIEW_SCHEMA,VERSION
+from .prompts import (interpret_prompt,review_axes_prompt,review_batch_prompt,
+  INTERPRET_SCHEMA,REVIEW_AXES_SCHEMA,REVIEW_BATCH_SCHEMA,VERSION)
 from .provider import ModelConfig,Provider,ReplayProvider,ExchangeProvider,PendingResponse
 from .audit import usage_report, export_batch
 from .calibration import recheck_packet
@@ -20,6 +21,7 @@ from .consensus import compare
 from .coordinate_grid import coordinate_grid
 from .visual_check import VisualCheckProvider
 from .review_validation import enforce_marker_centers
+from . import review_batches
 
 def write_json(path,data):
  path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
@@ -193,8 +195,28 @@ def run(args):
    write_json(out/'result.json',result);return result
   proposals=stage('proposals',lambda:geometry.analyze(out/'working.png',interpretation,out/'geometry'))
   reviewer=make_provider(config,out,'reviewer')
-  review=stage('review',lambda:reviewer.complete('review',review_prompt(proposals,context),
-       images=[out/'working.png',Path(proposals['overlay_path'])]+references,schema=REVIEW_SCHEMA))
+  # Review is split so no single call carries the whole figure: calibration once,
+  # then a few candidates per crop of the original pixels, each call bounded.
+  labels=[s['label'] for s in interpretation['series']]
+  axes_review=stage('review_axes',lambda:reviewer.complete('review_axes',
+       review_axes_prompt(labels,context),images=[out/'working.png']+references,
+       schema=REVIEW_AXES_SCHEMA))
+  batches=review_batches.plan(proposals['candidates'],size,
+    batch_size=config.get('review_batch_size',review_batches.BATCH_SIZE),
+    padding_px=config.get('review_batch_padding_px',review_batches.PADDING_PX),
+    min_side=config.get('review_batch_min_side_px',review_batches.MIN_SIDE))
+  write_json(out/'review_batches.json',batches)
+  parts=[]
+  for batch in batches:
+   crop_path=review_batches.crop(out/'working.png',batch,out/'review_batches')
+   with Image.open(crop_path) as im:crop_size=im.size
+   parts.append(stage(f"review_batch_{batch['index']:03d}",
+     lambda batch=batch,crop_path=crop_path,crop_size=crop_size:reviewer.complete(
+       f"review_batch_{batch['index']:03d}",
+       review_batch_prompt(batch,labels,crop_size,context),
+       images=[crop_path],schema=REVIEW_BATCH_SCHEMA)))
+  review=review_batches.merge(axes_review,parts,batches)
+  write_json(out/'review.json',review)
   review=enforce_marker_centers(review,proposals,config.get('review_center_tolerance_px',2.0))
   write_json(out/'review_center_checks.json',review.get('marker_center_checks',[]))
   # Review uses printed labels, rather than inheriting the first reader's assignments.

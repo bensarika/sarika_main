@@ -31,7 +31,7 @@ class ReviewContextTest(unittest.TestCase):
                 return VisualCheckProvider(Stub(),out/"visual_checks"/role)
             args=argparse.Namespace(source=str(root/'image.png'),config=str(root/'config.json'),out=str(root/'result'),query='observed',page=None,rotate=0,crop=None,context_file=str(root/'context.txt'),reference_image=None)
             with patch('chart_harness.cli.make_provider',side_effect=factory): run(args)
-            self.assertIn('Neutral protocol excerpt',seen['review'])
-            self.assertNotIn('"pixel": 90',seen['review'])
+            self.assertIn('Neutral protocol excerpt',seen['review_axes'])
+            self.assertNotIn('"pixel": 90',seen['review_axes'])
 
 if __name__=='__main__': unittest.main()

@@ -42,9 +42,14 @@ class CLITests(unittest.TestCase):
                     return {'annotations':[{'id':p['id'],'label':'Fixture annotation','status':'unresolved'} for p in points],'assessment':'concerns','notes':[]}
                 if stage=='interpret':return copy.deepcopy(parent.interpretation)
                 if stage=='layout':return {'panels':[{'id':'one','label':'one','crop_bbox':[0,0,200,160]}]}
-                if stage=='review':return {'axis_check':{k:copy.deepcopy(parent.interpretation[k]) for k in ('x_axis','y_axis')},
-                    'decisions':[{'candidate_id':'p0001','series_id':'Drug','role':'observed','reason':'Visible ring.','marker_center':{'x':100,'y':80}}],
-                    'status':'accepted','missing_points':[]}
+                if stage=='review_axes':return {'axis_check':{k:copy.deepcopy(parent.interpretation[k]) for k in ('x_axis','y_axis')},
+                    'series_labels':{'Drug':'Drug'},'status':'accepted','missing_points':[]}
+                if stage.startswith('review_batch_'):
+                    # Crop-local candidate coordinates come back in crop-local pixels.
+                    supplied=json.loads(prompt.split('Candidate locations: ',1)[1].split('\n',1)[0])
+                    return {'decisions':[{'candidate_id':c['candidate_id'],'series_id':'Drug','role':'observed',
+                        'reason':'Visible ring.','marker_center':dict(c['pixel'])} for c in supplied],
+                        'status':'accepted','missing_points':[]}
                 raise AssertionError(stage)
         return VisualCheckProvider(Fixture(),out/"visual_checks"/role)
 
@@ -57,7 +62,8 @@ class CLITests(unittest.TestCase):
         with patch('chart_harness.cli.make_provider',side_effect=self.provider):
             first=run(args)
             second=run(args)
-        self.assertEqual(self.calls,['interpret','interpret_visual_check','review','review_visual_check','final_output_visual_check'])
+        self.assertEqual(self.calls,['interpret','interpret_visual_check','review_axes','review_axes_visual_check',
+            'review_batch_000','review_batch_000_visual_check','final_output_visual_check'])
         self.assertEqual(first['counts']['observed'],1)
         self.assertEqual(second['status'],'review_required')
         for path in (self.root/'result/result.json',self.root/'result/final/result.json'):

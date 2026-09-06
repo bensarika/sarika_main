@@ -40,6 +40,25 @@ When the ticks are measured and agree with the anchors, that measurement outrank
 
 Configuration: `detect_ticks`, `repair_axes_from_ticks`, `axis_tick_tolerance_px`, `clamp_plot_bbox_to_axes`.
 
+## Batched review on original crops
+
+One review call covering the whole figure is slow, easy to stall and
+all-or-nothing: a single unfinished response discards the entire stage. Review is
+therefore split into one calibration call on the full image plus one call per
+small group of neighbouring candidates. Each of those calls receives exactly one
+image: an unresampled crop of the original chart around that group, with the
+candidate coordinates expressed in crop pixels, so the reply maps back by
+translation alone and no generated overlay is ever measured. Batches are
+individually cached stages, so a failed or slow batch only repeats itself.
+
+A batch that does not accept everything it was shown, or an axis reader that
+disagrees, keeps the whole review at `review_required`, and an undecided
+candidate stays unresolved rather than becoming an exported row.
+
+Configuration: `review_batch_size`, `review_batch_padding_px`,
+`review_batch_min_side_px`, plus `model.timeout_s` as a wall-clock deadline for
+each individual call.
+
 ## Cross-provider comparison
 
 ```
