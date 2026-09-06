@@ -356,27 +356,21 @@ input[type=range]::-moz-range-thumb { width:22px; height:22px; border-radius:50%
 .heat th { background:var(--slate-100); color:var(--slate-600); font-weight:600; }
 .heat td.h1 { background:#E6F1F1; } .heat td.h2 { background:#CFE5E6; } .heat td.h3 { background:#B3D6D8; } .heat td.h4 { background:#8FC2C5; }
 .heat td.sel { outline:2px solid var(--accent-700); outline-offset:-2px; font-weight:600; }
-/* Historical performance: horizontal grouped bars (one row per study/arm) */
-.hchart { display:grid; grid-template-columns:200px 1fr; gap:4px 12px; align-items:center; font-size:12px; }
-.hchart .lab { text-align:right; line-height:15px; }
-.hchart .lab b { display:block; font-weight:600; font-size:12px; }
-.hchart .lab .tiny { color:var(--slate-600); }
-.hchart .row { position:relative; height:60px; border-left:1px solid var(--slate-300); }
-.hchart .row.excluded { opacity:.45; }
-.hchart .bar { position:absolute; left:0; height:16px; border-radius:0 3px 3px 0; display:flex; align-items:center; justify-content:flex-end; padding-right:6px; color:#fff; font-family:var(--mono); font-size:10.5px; cursor:pointer; min-width:2px; white-space:nowrap; }
-.hchart .bar.pbo { top:3px; background:var(--slate-400); }
-.hchart .bar.act { top:22px; background:var(--accent-700); }
-.hchart .bar.jak { background:var(--prov-inherited); }
-.hchart .bar.out { color:var(--slate-800); }
-.hchart .bar .n { position:absolute; left:calc(100% + 6px); color:var(--slate-600); }
-.hchart .delta { position:absolute; top:44px; height:5px; border:1px solid var(--slate-600); border-top:0; }
-.hchart .delta span { position:absolute; left:50%; top:4px; transform:translateX(-50%); font-family:var(--mono); font-size:10px; background:#fff; padding:0 3px; color:var(--slate-800); white-space:nowrap; }
-.hchart .axis { grid-column:2; position:relative; height:16px; border-top:1px solid var(--slate-300); font-family:var(--mono); font-size:10px; color:var(--slate-600); }
-.hchart .axis span { position:absolute; transform:translateX(-50%); top:2px; }
-.hchart .axis span::before { content:""; position:absolute; left:50%; top:-5px; height:4px; width:1px; background:var(--slate-300); }
-.hchart .grp { grid-column:1/3; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--slate-600); font-weight:600; padding:10px 0 2px; border-bottom:1px solid var(--slate-200); margin-bottom:4px; }
-.hchart .dchart { position:relative; height:24px; }
-.hchart .dchart .bar { top:4px; }
+/* Historical performance: SVG dumbbell / Δ-forest / placebo lollipop (see docs/07_chart_recommendation.md).
+   Text is styled here rather than in attributes so the chart follows the app tokens. */
+.hsvg text { fill:var(--slate-950); }
+.hsvg .hl-name { font-size:13.5px; font-weight:600; }
+.hsvg .hl-sub { font-size:11.5px; fill:var(--slate-600); }
+.hsvg .hl-ex { font-size:11px; fill:var(--state-incomplete); font-style:italic; }
+.hsvg .hl-warn { font-size:11px; fill:var(--state-warning); font-style:italic; }
+.hsvg .hl-page { font-family:var(--mono); font-size:11px; fill:var(--slate-400); cursor:pointer; }
+.hsvg .hl-page:hover { fill:var(--accent-700); text-decoration:underline; }
+.hsvg .hl-val { font-family:var(--mono); font-size:11.5px; }
+.hsvg .hl-delta { font-family:var(--mono); font-size:11.5px; fill:var(--slate-800); }
+.hsvg .hl-note { font-size:11.5px; fill:var(--slate-400); font-style:italic; }
+.hsvg .hl-pooled { font-size:11.5px; font-weight:600; fill:var(--accent-700); }
+.hsvg .hl-tick { font-family:var(--mono); font-size:11px; fill:var(--slate-600); }
+.hsvg .hl-axis { font-size:12px; fill:var(--slate-600); }
 .legend { display:flex; gap:14px; font-size:11px; color:var(--slate-600); margin-top:10px; flex-wrap:wrap; }
 .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
 .seg { display:inline-flex; border:1px solid var(--slate-300); border-radius:var(--r6); overflow:hidden; }

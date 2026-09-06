@@ -35,7 +35,7 @@ Opening `index.html` directly from disk also works (hash routing, no fetches).
 | `#/library/templates` | Saved conversion templates | S2 |
 | `#/new/1…5` | New-from-starter wizard: choose → split/map → bind/adapt → key inputs → create | S2 |
 | `#/editor/W-102` | Docs-style editor: title/menu/toolbar header, wide sidebar (Outline / Workflow / Analysis), paper canvas, Inspector (Inspect / Findings / Ask / Compare / History) | S1, S3, S4, S6, S8, S10 |
-| `#/calculator` | Sample size in three numbered steps, working comparability checkboxes + pooling, sensitivity table with reading guide, historical bar chart (by study / treatment effect / placebo only) | S7 |
+| `#/calculator` | Sample size in three numbered steps, working comparability checkboxes + pooling, sensitivity table with reading guide, historical SVG chart: dumbbell (by study) / Δ forest (treatment effect) / placebo lollipop | S7 |
 | `#/admin/*` | Users, per-work permissions, usage, models & providers, audit | S9, S11 |
 
 ## Walkthrough notes (what the mock taught us)
@@ -79,14 +79,21 @@ Second round (user walkthrough feedback):
     table has a "How to read" strip (rows = ratio, columns = effect ±5 pts,
     outlined cell = current inputs). Panels are numbered 1-2-3 to give the
     eye a path: endpoint → placebo evidence → assumptions → headline → fragility.
-11. **Historical performance as horizontal bars, three views.** The first
+11. **Historical performance as a dumbbell chart, three views.** The first
     round's vertical dot strip was too abstract (no n, no arm names, study
-    labels truncated); vertical grouped bars were rejected on paper because
-    study names collide at 5+ studies. Horizontal grouped bars kept: study label
-    left, placebo/active bars with % and n, Δ bracket, faded rows for
-    excluded records. A *treatment effect* view puts the user's own
-    assumption (amber) next to history; a *placebo only* view shows exactly
-    what feeds the pooled estimate.
+    labels truncated); horizontal grouped bars (round 2) were better but
+    still made the eye compare bar lengths instead of the treatment effect.
+    A Devin data-analysis child session iterated six alternatives on the
+    illustrative CSV (`docs/07_chart_recommendation.md`) and recommended the
+    current design: one row per trial, grey placebo dot → coloured active
+    dot, Δ + 95% CI (Newcombe) written on the connector, the user's own
+    assumption pinned on top in amber and drawn the same way, a pooled-placebo
+    band, dot area ∝ n, JAK-like arms as diamonds, and excluded records faded
+    + dashed below a labelled divider with the exclusion reason. Secondary
+    tabs: a *treatment effect* forest (Δ with CI, numeric column right of
+    the plot) and a *placebo only* lollipop with Wilson CIs on a 0–50 % scale.
+    The chart re-renders live as the sliders move. Placebo grey is `#9CA3AF`
+    for deuteranopia separation from teal.
 12. **Uppercase, letter-spaced headers and tabs** everywhere (page titles,
     panel headers, top nav, sidebar/inspector tabs, wizard steps).
 13. **Editor is document-first.** A persistent horizontal app bar sits over

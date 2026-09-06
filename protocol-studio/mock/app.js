@@ -368,6 +368,7 @@ function calcSet(k, v) {
   const rng = $('#rng-' + k); if (rng && document.activeElement !== rng) rng.value = state.calc[k];
   const out = $('#calc-out'); if (out) out.innerHTML = calcOutHtml();
   const pool = $('#pool-box'); if (pool) pool.checked = state.calc.pool;
+  const ch = $('#hist-chart'); if (ch) ch.innerHTML = histChartHtml(); // user row / reference line tracks the sliders
 }
 const CALC_FIELDS = [
   ['p0', 'Placebo response at Week 16', 0.05, 0.4, 0.005, (v) => (v * 100).toFixed(1) + '%', 100],
@@ -391,20 +392,130 @@ function calcOutHtml() {
     <table class="heat"><thead><tr><th>allocation ↓ / true effect →</th><th>SRK-201 ${((c.p1 - 0.05) * 100).toFixed(0)}% (worse)</th><th>SRK-201 ${(c.p1 * 100).toFixed(0)}% (as entered)</th><th>SRK-201 ${((c.p1 + 0.05) * 100).toFixed(0)}% (better)</th></tr></thead><tbody>${grid.map((row, i) => h`<tr><th>${i + 1}:1</th>${row.map((v, j) => h`<td class="${v > total * 1.3 ? 'h4' : v > total * 1.1 ? 'h3' : v > total * 0.9 ? 'h2' : 'h1'} ${i + 1 === c.ratio && j === 1 ? 'sel' : ''}">${v}</td>`).join('')}</tr>`).join('')}</tbody></table>
     <div class="tiny muted" style="margin-top:8px">Not modelled here (stated, never silently assumed): interim analyses, multiplicity across endpoints, Bayesian decision rules, precision-based sizing.</div>`;
 }
+/* ---------- Historical chart (SVG) ----------
+   Encodings follow the data-analysis recommendation (docs/07_chart_recommendation.md):
+   default = dumbbell (placebo → active per trial, user row pinned on top, pooled-placebo band,
+   Δ + 95% CI on the connector); secondary = Δ forest and placebo lollipop. Ordering: user row,
+   comparable trials with Δ (Δ desc), comparable placebo-only, divider, excluded. Marker AREA ∝ n. */
+const Z95 = 1.959964;
+function wilsonCi(pct, n) {
+  const p = pct / 100, z2 = Z95 * Z95, den = 1 + z2 / n;
+  const c = (p + z2 / (2 * n)) / den, half = Z95 * Math.sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / den;
+  return [100 * (c - half), 100 * (c + half)];
+}
+function newcombeCi(p1, n1, p2, n2) { // active − placebo, percentage points
+  const [l1, u1] = wilsonCi(p1, n1), [l2, u2] = wilsonCi(p2, n2), d = p1 - p2;
+  return [d - Math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2), d + Math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2)];
+}
+const markR = (n) => 0.7 * Math.sqrt(30 + 0.55 * n); // radius in px so that area ∝ n
+const fmtPts = (v) => (v >= 0 ? '+' : '') + v.toFixed(1);
+/* One row per trial, tagged with inclusion (from the user's ticks) and sorted per the ordering rules. */
+function histTrials() {
+  const inc = calcIncluded(), by = {};
+  calcRows().forEach((r) => { const g = (by[r.study] = by[r.study] || { s: r.s, tp: r.tp, study: r.study }); g[r.arm === 'placebo' ? 'pbo' : 'act'] = r; });
+  const trials = Object.values(by).filter((g) => g.pbo).map((g) => {
+    const t = { ...g, included: inc.has(g.study), why: g.pbo.why, pboCi: wilsonCi(g.pbo.pct, g.pbo.n) };
+    if (g.act) { t.delta = g.act.pct - g.pbo.pct; t.deltaCi = newcombeCi(g.act.pct, g.act.n, g.pbo.pct, g.pbo.n); t.actCi = wilsonCi(g.act.pct, g.act.n); }
+    return t;
+  });
+  const key = (t) => (t.act ? [0, -t.delta] : [1, -t.pbo.pct]);
+  const cmp = (a, b) => { const ka = key(a), kb = key(b); return ka[0] - kb[0] || ka[1] - kb[1]; };
+  return { included: trials.filter((t) => t.included).sort(cmp), excluded: trials.filter((t) => !t.included).sort(cmp) };
+}
 function histChartHtml() {
   const view = state.calc.view || 'study';
-  const rows = calcRows(); const inc = calcIncluded();
-  const byStudy = {}; rows.forEach((r) => { (byStudy[r.study] = byStudy[r.study] || { s: r.s, tp: r.tp }); byStudy[r.study][r.arm === 'placebo' ? 'pbo' : 'act'] = r; });
-  const studies = Object.values(byStudy).sort((a, b) => (b.act ? b.act.pct : 0) - (a.act ? a.act.pct : 0));
-  const W = (pct) => `width:${pct}%`;
-  const bar = (r, cls) => r ? h`<span class="bar ${cls} ${r.jak ? 'jak' : ''} ${r.pct < 12 ? 'out' : ''}" style="${W(r.pct)}" title="${esc(r.s.name)} · ${r.arm} · ${r.pct}% (n=${r.n}) · p. ${r.page}" onclick="toast('Open ${esc(r.s.name)} p. ${r.page} (mock)')">${r.pct.toFixed(1)}%<span class="n">n=${r.n} · ${esc(r.arm)}</span></span>` : '';
-  const axis = h`<span></span><div class="axis">${[0, 20, 40, 60, 80].map((v) => h`<span style="left:${v}%">${v}%</span>`).join('')}</div>`;
+  const { included, excluded } = histTrials();
+  const pooled = calcPooled();
+  const pooledCi = pooled ? wilsonCi(pooled.pct, calcRows().filter((r) => r.arm === 'placebo' && calcIncluded().has(r.study)).reduce((a, r) => a + r.n, 0)) : null;
+  const uP0 = state.calc.p0 * 100, uP1 = state.calc.p1 * 100, uD = uP1 - uP0;
+  // Geometry (viewBox units; the SVG scales to the panel width)
+  const W = 960, L = 290, ROW = 48, TOP = 36, GAP = 24;
+  const R = view === 'study' ? 905 : 660; // forest + placebo views keep a numeric column right of the plot
+  // x-domain per view: % scale for dumbbell, Δ pts for the forest, zoomed % scale for placebo (rates cluster at 10–25 %)
+  const dom = view === 'delta' ? [-10, 80] : view === 'placebo' ? [0, 50] : [0, 100];
+  const x = (v) => L + (v - dom[0]) / (dom[1] - dom[0]) * (R - L);
+  const ys = []; let y = TOP + ROW / 2;
+  ys.push(['user', y]); y += ROW * 1.2;
+  included.forEach((t) => { ys.push([t, y]); y += ROW; });
+  let divY = null; if (excluded.length) { divY = y - ROW / 2 + GAP / 2; y += GAP; excluded.forEach((t) => { ys.push([t, y]); y += ROW; }); }
+  const H = y + 40;
+  const C = { pbo: '#9CA3AF', pboText: '#374151', act: 'var(--accent-700)', jak: 'var(--prov-inherited)', user: 'var(--prov-proposed)', band: 'var(--accent-100)', exText: 'var(--state-incomplete)', sep: 'var(--slate-300)' };
+  const label = (t, yy) => h`<text x="${L - 14}" y="${yy - 4}" text-anchor="end" class="hl-name" opacity="${t.included ? 1 : 0.6}">${esc(t.s.name.replace(/ \(.*\)/, ''))}</text>
+    <text x="${L - 14}" y="${yy + 10}" text-anchor="end" class="hl-sub">${esc((t.act ? t.act.arm.replace(/^\S+\s/, '') + ' · ' : '') + t.s.moa + ' · Phase ' + t.s.phase + ' · ' + t.tp)}</text>
+    ${!t.included && t.why ? h`<text x="${L - 14}" y="${yy + 23}" text-anchor="end" class="hl-ex">excluded: ${esc(t.why)}</text>` : t.included && t.why ? h`<text x="${L - 14}" y="${yy + 23}" text-anchor="end" class="hl-warn">included despite: ${esc(t.why)}</text>` : ''}
+    <text x="${915}" y="${yy + 4}" class="hl-page" onclick="toast('Open ${esc(t.s.name)} p. ${t.pbo.page} (mock)')">p.${t.pbo.page}</text>`;
+  const marker = (cx, cy, r, fill, { jak, open, faded } = {}) => jak
+    ? h`<polygon points="${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}" fill="${open ? '#fff' : fill}" stroke="${fill}" stroke-width="2" opacity="${faded ? 0.45 : 1}"/>`
+    : h`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${open ? '#fff' : fill}" stroke="${open ? fill : '#fff'}" stroke-width="${open ? 2 : 1.5}" opacity="${faded ? 0.45 : 1}"/>`;
+  const axis = (ticks, unit, title) => h`<line x1="${L}" x2="${R}" y1="${H - 34}" y2="${H - 34}" stroke="${C.sep}"/>
+    ${ticks.map((v) => h`<line x1="${x(v)}" x2="${x(v)}" y1="${H - 34}" y2="${H - 30}" stroke="${C.sep}"/><text x="${x(v)}" y="${H - 18}" text-anchor="middle" class="hl-tick">${v}${unit}</text>`).join('')}
+    <text x="${(L + R) / 2}" y="${H - 3}" text-anchor="middle" class="hl-axis">${title}</text>`;
+  const grid = (ticks) => ticks.map((v) => h`<line x1="${x(v)}" x2="${x(v)}" y1="${TOP - 6}" y2="${H - 34}" stroke="var(--slate-100)"/>`).join('');
+  const divider = divY === null ? '' : h`<line x1="${L}" x2="${R}" y1="${divY}" y2="${divY}" stroke="${C.sep}" stroke-dasharray="3 3"/><text x="${L}" y="${divY - 5}" class="hl-ex" font-weight="600">EXCLUDED FROM POOLING — shown for context, not equivalent</text>`;
   let body = '';
-  if (view === 'study') body = studies.map((g) => { const ex = g.pbo && !inc.has(g.pbo.study); return h`<div class="lab"><b>${esc(g.s.name.replace(/ \(.*\)/, ''))}</b><span class="tiny">${g.s.moa} · Phase ${g.s.phase} · ${g.tp}${ex ? ' · <span style="color:var(--state-incomplete)">excluded from pooling</span>' : ''}</span></div><div class="row ${ex ? 'excluded' : ''}">${bar(g.pbo, 'pbo')}${g.act ? bar(g.act, 'act') : '<span class="bar act out" style="width:0"><span class="n muted">active arm not yet extracted</span></span>'}${g.act && g.pbo ? h`<span class="delta" style="left:${g.pbo.pct}%;width:${g.act.pct - g.pbo.pct}%"><span>Δ ${(g.act.pct - g.pbo.pct).toFixed(0)} pts</span></span>` : ''}</div>`; }).join('') + axis;
-  if (view === 'delta') body = h`<div class="grp">Treatment effect vs placebo (active − placebo, percentage points)</div>` + studies.filter((g) => g.act && g.pbo).map((g) => h`<div class="lab"><b>${esc(g.s.name.replace(/ \(.*\)/, ''))}</b><span class="tiny">${g.act.arm} · ${g.tp}</span></div><div class="row dchart"><span class="bar act ${g.act.jak ? 'jak' : ''}" style="${W(g.act.pct - g.pbo.pct)}">+${(g.act.pct - g.pbo.pct).toFixed(1)} pts<span class="n">${g.act.pct}% vs ${g.pbo.pct}%</span></span></div>`).join('') + h`<div class="lab"><b>Your assumption</b><span class="tiny">SRK-201 vs placebo</span></div><div class="row dchart"><span class="bar act" style="${W((state.calc.p1 - state.calc.p0) * 100)};background:var(--prov-proposed)">+${((state.calc.p1 - state.calc.p0) * 100).toFixed(0)} pts<span class="n">${(state.calc.p1 * 100).toFixed(0)}% vs ${(state.calc.p0 * 100).toFixed(0)}%</span></span></div>` + axis;
-  if (view === 'placebo') body = h`<div class="grp">Placebo response only — what feeds the pooled estimate</div>` + rows.filter((r) => r.arm === 'placebo').sort((a, b) => b.pct - a.pct).map((r) => h`<div class="lab"><b>${esc(r.s.name.replace(/ \(.*\)/, ''))}</b><span class="tiny">${r.tp} · n=${r.n}${r.why ? ' · ' + esc(r.why) : ''}</span></div><div class="row dchart ${inc.has(r.study) ? '' : 'excluded'}">${bar(r, 'pbo')}</div>`).join('') + axis;
-  return h`<div class="hchart">${body}</div>
-    <div class="legend"><span><i style="background:var(--slate-400)"></i>placebo arm</span><span><i style="background:var(--accent-700)"></i>active arm</span><span><i style="background:var(--prov-inherited)"></i>active arm in the "JAK-like" profile</span><span><i style="background:var(--prov-proposed)"></i>your assumption</span><span style="opacity:.5">faded = excluded from pooling</span></div>`;
+  /* --- Default: dumbbell --- */
+  if (view === 'study') {
+    const band = pooled ? h`<rect x="${x(pooled.lo)}" y="${TOP - 6}" width="${Math.max(2, x(pooled.hi) - x(pooled.lo))}" height="${H - 28 - TOP}" fill="${C.band}" opacity=".7"/><line x1="${x(pooled.pct)}" x2="${x(pooled.pct)}" y1="${TOP - 6}" y2="${H - 34}" stroke="${C.act}" stroke-dasharray="2 3"/>
+      <text x="${x(pooled.pct)}" y="${TOP - 12}" text-anchor="middle" class="hl-pooled">pooled placebo ${pooled.pct.toFixed(1)}% · ${pooled.n} included arm${pooled.n === 1 ? '' : 's'}, range ${pooled.lo}–${pooled.hi}%</text>` : '';
+    const row = (t, yy) => {
+      const a = t.included ? 1 : 0.45, col = t.act && t.act.jak ? C.jak : C.act;
+      return h`${label(t, yy)}
+        <line x1="${x(t.pboCi[0])}" x2="${x(t.pboCi[1])}" y1="${yy}" y2="${yy}" stroke="${C.pbo}" stroke-width="1.2" opacity="${a * 0.8}"/>
+        ${t.act ? h`<line x1="${x(t.pbo.pct)}" x2="${x(t.act.pct)}" y1="${yy}" y2="${yy}" stroke="${col}" stroke-width="2.6" opacity="${a}" ${t.included ? '' : 'stroke-dasharray="6 4"'}/>
+          <text x="${x((t.pbo.pct + t.act.pct) / 2)}" y="${yy - 9}" text-anchor="middle" class="hl-delta" opacity="${a}" font-weight="${t.included ? 600 : 400}">Δ ${fmtPts(t.delta)} pts  (95% CI ${fmtPts(t.deltaCi[0])} to ${fmtPts(t.deltaCi[1])})</text>
+          ${marker(x(t.act.pct), yy, markR(t.act.n), col, { jak: t.act.jak, faded: !t.included })}
+          <text x="${x(t.act.pct) + markR(t.act.n) + 5}" y="${yy + 4}" class="hl-val" fill="${col}" opacity="${a}">${t.act.pct.toFixed(1)}%  n=${t.act.n}</text>`
+        : h`<text x="${x(t.pboCi[1]) + 8}" y="${yy + 4}" class="hl-note" opacity="${a}">active arm not yet extracted</text>`}
+        ${marker(x(t.pbo.pct), yy, markR(t.pbo.n), C.pbo, { faded: !t.included })}
+        ${t.pbo.pct < 13 && !t.act ? h`<text x="${x(t.pbo.pct)}" y="${yy - 12}" text-anchor="middle" class="hl-val" fill="${C.pboText}" opacity="${a}">${t.pbo.pct.toFixed(1)}%  n=${t.pbo.n}</text>` : h`<text x="${x(t.pbo.pct) - markR(t.pbo.n) - 5}" y="${yy + 4}" text-anchor="end" class="hl-val" fill="${C.pboText}" opacity="${a}">${t.pbo.pct.toFixed(1)}%  n=${t.pbo.n}</text>`}`;
+    };
+    const user = (yy) => h`<text x="${L - 14}" y="${yy - 4}" text-anchor="end" class="hl-name" fill="${C.user}">Your assumption · SRK-201</text><text x="${L - 14}" y="${yy + 10}" text-anchor="end" class="hl-sub" fill="${C.user}">placebo ${uP0.toFixed(1)}% → active ${uP1.toFixed(1)}%</text>
+      <line x1="${x(uP0)}" x2="${x(uP1)}" y1="${yy}" y2="${yy}" stroke="${C.user}" stroke-width="2.6"/>
+      <text x="${x((uP0 + uP1) / 2)}" y="${yy - 9}" text-anchor="middle" class="hl-delta" fill="${C.user}" font-weight="600">Δ ${fmtPts(uD)} pts</text>
+      ${marker(x(uP0), yy, 7, C.user, { open: true })}${marker(x(uP1), yy, 7, C.user)}
+      <text x="${x(uP0) - 12}" y="${yy + 4}" text-anchor="end" class="hl-val" fill="${C.user}" font-weight="600">${uP0.toFixed(1)}%</text><text x="${x(uP1) + 12}" y="${yy + 4}" class="hl-val" fill="${C.user}" font-weight="600">${uP1.toFixed(1)}%</text>`;
+    body = grid([20, 40, 60, 80]) + band + ys.map(([t, yy]) => (t === 'user' ? user(yy) : row(t, yy))).join('') + divider + axis([0, 20, 40, 60, 80, 100], '%', 'Participants reaching EASI-75 (%) — grey dot = placebo arm, coloured dot = active arm, dot area ∝ arm size n');
+  }
+  /* --- Secondary: Δ forest --- */
+  if (view === 'delta') {
+    const row = (t, yy) => {
+      const a = t.included ? 1 : 0.45, col = t.act && t.act.jak ? C.jak : C.act;
+      return h`${label(t, yy)}${t.act ? h`
+        <line x1="${x(t.deltaCi[0])}" x2="${x(t.deltaCi[1])}" y1="${yy}" y2="${yy}" stroke="${col}" stroke-width="2" opacity="${a}" ${t.included ? '' : 'stroke-dasharray="6 4"'}/>
+        ${marker(x(t.delta), yy, markR(t.act.n + t.pbo.n), col, { jak: t.act.jak, faded: !t.included })}
+        <text x="${R + 14}" y="${yy - 2}" class="hl-val" fill="${col}" opacity="${a}" font-weight="600">Δ ${fmtPts(t.delta)} pts  (${fmtPts(t.deltaCi[0])} to ${fmtPts(t.deltaCi[1])})</text><text x="${R + 14}" y="${yy + 12}" class="hl-val" fill="${C.pboText}" opacity="${a}">${t.act.pct}% (n=${t.act.n}) vs ${t.pbo.pct}% (n=${t.pbo.n})</text>`
+        : h`<text x="${x(0) + 8}" y="${yy + 4}" class="hl-note" opacity="${a}">no Δ (active arm not extracted) — see Placebo only</text>`}`;
+    };
+    const user = (yy) => h`<text x="${L - 14}" y="${yy - 4}" text-anchor="end" class="hl-name" fill="${C.user}">Your assumption · SRK-201</text><text x="${L - 14}" y="${yy + 10}" text-anchor="end" class="hl-sub" fill="${C.user}">Δ ${fmtPts(uD)} pts (${uP1.toFixed(0)}% vs ${uP0.toFixed(0)}%)</text>
+      <line x1="${x(uD)}" x2="${x(uD)}" y1="${TOP - 6}" y2="${H - 34}" stroke="${C.user}" stroke-dasharray="5 4" stroke-width="1.5"/>
+      ${marker(x(uD), yy, 7, C.user)}<text x="${R + 14}" y="${yy + 4}" class="hl-val" fill="${C.user}" font-weight="600">Δ ${fmtPts(uD)} pts  (your entry)</text>
+      <text x="${R + 14}" y="${TOP - 12}" class="hl-tick">Δ (95% CI) · active vs placebo</text>`;
+    body = grid([0, 20, 40, 60]) + h`<line x1="${x(0)}" x2="${x(0)}" y1="${TOP - 6}" y2="${H - 34}" stroke="${C.sep}"/>` + ys.map(([t, yy]) => (t === 'user' ? user(yy) : row(t, yy))).join('') + divider + axis([-10, 0, 20, 40, 60, 80], '', 'Treatment effect: active − placebo (percentage points), 95% CI (Newcombe); marker area ∝ total n');
+  }
+  /* --- Secondary: placebo lollipop with pooled band --- */
+  if (view === 'placebo') {
+    const srt = (arr) => [...arr].sort((a, b) => b.pbo.pct - a.pbo.pct);
+    const ys2 = []; let yy = TOP + ROW / 2; ys2.push(['user', yy]); yy += ROW * 1.2;
+    srt(included).forEach((t) => { ys2.push([t, yy]); yy += ROW; });
+    let dv = null; if (excluded.length) { dv = yy - ROW / 2 + GAP / 2; yy += GAP; srt(excluded).forEach((t) => { ys2.push([t, yy]); yy += ROW; }); }
+    const band = pooled ? h`<rect x="${x(pooled.lo)}" y="${TOP - 6}" width="${Math.max(2, x(pooled.hi) - x(pooled.lo))}" height="${H - 28 - TOP}" fill="${C.band}" opacity=".5"/>
+      <rect x="${x(pooledCi[0])}" y="${TOP - 6}" width="${x(pooledCi[1]) - x(pooledCi[0])}" height="${H - 28 - TOP}" fill="${C.act}" opacity=".12"/>
+      <line x1="${x(pooled.pct)}" x2="${x(pooled.pct)}" y1="${TOP - 6}" y2="${H - 34}" stroke="${C.act}" stroke-dasharray="2 3"/>
+      <text x="${x(pooled.pct)}" y="${TOP - 12}" text-anchor="middle" class="hl-pooled">pooled ${pooled.pct.toFixed(1)}% (95% CI ${pooledCi[0].toFixed(1)}–${pooledCi[1].toFixed(1)}) · light band = observed range ${pooled.lo}–${pooled.hi}%</text>` : h`<text x="${L}" y="${TOP - 12}" class="hl-ex">No placebo arms ticked — nothing to pool.</text>`;
+    const row = (t, y0) => { const a = t.included ? 1 : 0.45; return h`${label(t, y0)}
+      <line x1="${x(0)}" x2="${x(t.pbo.pct)}" y1="${y0}" y2="${y0}" stroke="${C.pbo}" stroke-width="1" opacity="${a * 0.5}" ${t.included ? '' : 'stroke-dasharray="4 3"'}/>
+      <line x1="${x(t.pboCi[0])}" x2="${x(t.pboCi[1])}" y1="${y0}" y2="${y0}" stroke="${C.pboText}" stroke-width="2" opacity="${a}"/>
+      ${marker(x(t.pbo.pct), y0, markR(t.pbo.n), C.pbo, { faded: !t.included })}
+      <text x="${R + 14}" y="${y0 - 2}" class="hl-val" fill="${C.pboText}" opacity="${a}" font-weight="600">${t.pbo.pct.toFixed(1)}%  (95% CI ${t.pboCi[0].toFixed(1)}–${t.pboCi[1].toFixed(1)})</text><text x="${R + 14}" y="${y0 + 12}" class="hl-val" fill="${C.pboText}" opacity="${a}">n=${t.pbo.n} placebo</text>`; };
+    const user = (y0) => h`<text x="${L - 14}" y="${y0 - 4}" text-anchor="end" class="hl-name" fill="${C.user}">Your placebo assumption</text><text x="${L - 14}" y="${y0 + 10}" text-anchor="end" class="hl-sub" fill="${C.user}">${state.calc.pool ? 'derived from pooled evidence' : 'entered manually'}</text>
+      <line x1="${x(uP0)}" x2="${x(uP0)}" y1="${TOP - 6}" y2="${H - 34}" stroke="${C.user}" stroke-dasharray="5 4" stroke-width="1.5"/>
+      ${marker(x(uP0), y0, 7, C.user, { open: true })}<text x="${R + 14}" y="${y0 + 4}" class="hl-val" fill="${C.user}" font-weight="600">${uP0.toFixed(1)}%${pooled && (uP0 < pooled.lo || uP0 > pooled.hi) ? ' — outside observed range' : ''}</text>
+      <text x="${R + 14}" y="${TOP - 12}" class="hl-tick">placebo % (Wilson 95% CI)</text>`;
+    const div2 = dv === null ? '' : h`<line x1="${L}" x2="${R}" y1="${dv}" y2="${dv}" stroke="${C.sep}" stroke-dasharray="3 3"/><text x="${L}" y="${dv - 5}" class="hl-ex" font-weight="600">EXCLUDED FROM POOLING — shown for context, not equivalent</text>`;
+    body = grid([10, 20, 30, 40]) + band + ys2.map(([t, y0]) => (t === 'user' ? user(y0) : row(t, y0))).join('') + div2 + axis([0, 10, 20, 30, 40, 50], '%', 'Placebo participants reaching EASI-75 (%) with Wilson 95% CI; dot area ∝ arm size n');
+  }
+  const legend = h`<div class="legend"><span><i style="background:#9CA3AF;border-radius:50%"></i>placebo arm</span><span><i style="background:var(--accent-700);border-radius:50%"></i>active arm</span><span><i style="background:var(--prov-inherited);transform:rotate(45deg);border-radius:1px"></i>active arm, JAK-like profile</span><span><i style="border:2px solid var(--prov-proposed);border-radius:50%;background:#fff"></i>your assumption</span><span><i style="background:var(--accent-100)"></i>pooled placebo range</span><span style="opacity:.55">faded + dashed = excluded from pooling</span><span class="mono">p.# = source page (click to open)</span></div>`;
+  return h`<svg class="hsvg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;height:auto;font-family:var(--ui)">${body}</svg>${legend}`;
 }
 function calculatorView() {
   const c = state.calc; calcIncluded();
@@ -422,8 +533,8 @@ function calculatorView() {
     <h3><span class="step">3</span>Design assumptions</h3><div class="body">${CALC_FIELDS.map(inp).join('')}</div></div>
   <div><div class="panel" style="margin-bottom:16px"><h3>Sample size — what you need to enrol <span class="grow"></span><button class="btn sm" onclick="toast('Saved to W-102 §10.11 as author-supplied sample_size with assumptions + evidence links (mock)')">Save to protocol §10.11</button></h3><div class="body" id="calc-out">${calcOutHtml()}</div></div>
   <div class="panel"><h3>Historical EASI-75 response — what other trials saw <span class="grow"></span><span class="seg">${[['study', 'By study'], ['delta', 'Treatment effect'], ['placebo', 'Placebo only']].map(([k, l]) => h`<a class="${(c.view || 'study') === k ? 'active' : ''}" onclick="state.calc.view='${k}';render()">${l}</a>`).join('')}</span></h3><div class="body">
-    <div class="howto"><b>How to read:</b> ${{ study: 'one row per trial; grey = placebo arm, coloured = active arm, bar length = % of participants reaching EASI-75. The bracket shows Δ, the treatment effect. Faded rows are excluded from your pooled placebo estimate.', delta: 'one bar per trial = active minus placebo response, in percentage points. The amber bar is the effect you entered on the left — if it is much longer than the historical bars, your assumption is optimistic.', placebo: 'placebo arms only, sorted high to low. Ticked (solid) rows are pooled into your placebo assumption; faded rows are not. A wide spread here means the placebo assumption is fragile.' }[c.view || 'study']} Click any bar to open the source page it was extracted from.</div>
-    ${histChartHtml()}
+    <div class="howto"><b>How to read:</b> ${{ study: 'one row per trial, grey dot = placebo arm → coloured dot = active arm; the connector length is Δ, the treatment effect (with 95% CI). Your assumption is the amber row on top, drawn the same way — compare its connector to the rows beneath. The teal band is the range of the placebo arms you ticked; dot area ∝ arm size. Faded, dashed rows below the divider are excluded from pooling.', delta: 'one row per trial = active minus placebo, in percentage points, with its 95% CI (Newcombe) as the whisker; marker area ∝ total n. The dashed amber line is the Δ you entered — if it sits inside a comparable trial\u2019s CI it is historically plausible; far to the right of every CI means optimistic.', placebo: 'placebo arms only, sorted high to low, each with its Wilson 95% CI. The pooled estimate (dotted line) and its CI (darker band) come only from the arms you ticked; the light band is their observed range. Your placebo assumption is the dashed amber line — a wide range here means it is fragile.' }[c.view || 'study']} Click <span class="mono">p.#</span> to open the source page a value was extracted from.</div>
+    <div id="hist-chart">${histChartHtml()}</div>
     <div class="toolbar" style="margin-top:12px"><button class="btn" onclick="toast('Endpoint explorer (exploratory): profile JAK-like → endpoint × timepoint N alongside regulatory precedent + relevance (Pilot 4b)')">Open endpoint explorer (exploratory)</button><span class="tiny muted">Profile: <b>JAK-like</b> (saved object · 2 records · editable)</span></div>
   </div></div></div></div></div>`;
   return frame('calc', h`<b>Trial calculator</b><span class="sep">·</span><span class="muted">SRK-201 · EASI-75 · Week 16</span>`, body);
