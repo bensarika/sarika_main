@@ -1,4 +1,4 @@
-# Spark Dodge
+# Sarika Pong
 
 Single-page canvas game. No build step or dependencies — `index.html` is the whole app.
 
