@@ -41,6 +41,8 @@ class CLITests(unittest.TestCase):
                     points=json.loads(prompt.split('Fixed anchors: ',1)[1].split('\nYour result:',1)[0])
                     return {'annotations':[{'id':p['id'],'label':'Fixture annotation','status':'unresolved'} for p in points],'assessment':'concerns','notes':[]}
                 if stage=='interpret':return copy.deepcopy(parent.interpretation)
+                if stage=='unsteered':return {'series':[{'label':'Drug',
+                    'points':[{'x':9.2,'y':100}]}],'notes':[]}
                 if stage=='layout':return {'panels':[{'id':'one','label':'one','crop_bbox':[0,0,200,160]}]}
                 if stage=='review_axes':return {'axis_check':{k:copy.deepcopy(parent.interpretation[k]) for k in ('x_axis','y_axis')},
                     'series_labels':{'Drug':'Drug'},'status':'accepted','missing_points':[]}
@@ -62,8 +64,14 @@ class CLITests(unittest.TestCase):
         with patch('chart_harness.cli.make_provider',side_effect=self.provider):
             first=run(args)
             second=run(args)
-        self.assertEqual(self.calls,['interpret','interpret_visual_check','review_axes','review_axes_visual_check',
-            'review_batch_000','review_batch_000_visual_check','final_output_visual_check'])
+        # The unaided control runs alongside the reading; it is asked once per
+        # run and never reused from the resumed stages, because it is not one.
+        self.assertEqual([c for c in self.calls if not c.startswith('unsteered')],
+            ['interpret','interpret_visual_check','review_axes','review_axes_visual_check',
+             'review_batch_000','review_batch_000_visual_check','final_output_visual_check'])
+        self.assertEqual(2,self.calls.count('unsteered'))
+        self.assertEqual(first['unsteered']['points_unaided'],1)
+        self.assertTrue((self.root/'result/unsteered_reading.json').is_file())
         self.assertEqual(first['counts']['observed'],1)
         self.assertEqual(second['status'],'review_required')
         for path in (self.root/'result/result.json',self.root/'result/final/result.json'):

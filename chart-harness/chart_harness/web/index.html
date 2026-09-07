@@ -330,7 +330,10 @@ function panel(side) {
   const blocks = {};
   for (const [key, title] of [['legend', 'legend'], ['glyphs', 'legend glyphs (templates python searches for)'],
        ['marks', 'marks measured out of the plot (no legend)'],
-       ['candidates', 'candidates proposed'], ['screen', 'pixel screen'], ['judgment', 'judged by the other reader'],
+       ['candidates', 'candidates proposed'], ['screen', 'pixel screen'],
+       ['spacing', 'how long each series should be, judged by its own spacing'],
+       ['unsteered', 'the same reader asked with no help at all'],
+       ['judgment', 'judged by the other reader'],
        ['iteration', 'second pass'], ['overlay', 'annotated versions (newest first)'], ['result', 'result']]) {
     const d = document.createElement('details'); d.hidden = true;
     const s = document.createElement('summary'); s.textContent = title; d.append(s);
@@ -573,6 +576,25 @@ const render = {
     wrap.append($('div', null, e.state === 'started' ? 'running with corrections' : 'finished — ' + e.status));
     if (e.feedback) wrap.append(Object.assign(document.createElement('pre'), { textContent: e.feedback }));
     show(p, 'iteration', wrap);
+  },
+  unsteered(p, e) {
+    // What the same reader said when it was handed the picture and the question
+    // and nothing else. Shown beside the reading, never folded into it: the
+    // distance between the two is what all the scaffolding bought on this page.
+    const wrap = $('div');
+    wrap.append($('div', null, e.reading || ''));
+    const t = $('table');
+    t.append(row('th', ['group', 'points asked with no help']));
+    for (const s of e.series || [])
+      t.append(row('td', [s.label || 'unnamed', (s.points || []).length]));
+    wrap.append(t);
+    const apart = e.separation_as_a_share_of_the_span;
+    if (apart) wrap.append($('div', null,
+      'median ' + (apart.median * 100).toFixed(1) + '% of the data span apart, worst '
+      + (apart.worst * 100).toFixed(1) + '%'));
+    wrap.append($('div', null, 'groups both named: '
+      + ((e.groups_both_named || []).join(', ') || 'none')));
+    show(p, 'unsteered', wrap);
   },
   result(p, e) {
     p.view.rows = e.rows || [];

@@ -29,6 +29,7 @@ from . import duel
 from . import frame_fit
 from . import panel_fit
 from . import reading_fit
+from . import unsteered
 from .consensus import compare
 from .coordinate_grid import coordinate_grid
 from .visual_check import VisualCheckProvider
@@ -326,6 +327,18 @@ def run(args):
   progress.emit('image',path=str(out/'working.png'),width=size[0],height=size[1],
     page=page,rotation=rotation)
   interpreter=make_provider(config,out,'model',expires)
+  # The unaided lane starts with everything else and is never waited on: it is a
+  # control, so it costs the reading nothing and settles what the scaffolding is
+  # worth on this page rather than in the abstract.
+  unaided_pool=unaided_call=None
+  if config.get('unsteered_lane',True):
+   unaided_pool=ThreadPoolExecutor(max_workers=1)
+   # A control whose answer is thrown away for failing the annotation stage is
+   # not a control, so its check is recorded rather than enforced.
+   unaided_reader=make_provider({**config,'visual_check_strict':False},
+     out/'unsteered','model',expires)
+   unaided_call=unaided_pool.submit(progress.bound(
+     lambda:unsteered.ask(unaided_reader,out/'working.png')))
   references=[Path(p) for p in (getattr(args,'reference_images',[]) or ([args.reference_image] if getattr(args,'reference_image',None) else []))]
   if config.get('coordinate_grid',False):
    references.insert(0,coordinate_grid(out/'working.png',out/'coordinate_grid.png'))
@@ -874,6 +887,29 @@ def run(args):
                       'image_path':str(out/'working.png')}})
   result['_visual_check']=checked['_visual_check']
   if (result['_visual_check']['assessment']=='concerns' or interpretation.get('_visual_check',{}).get('assessment')=='concerns' or review.get('_visual_check',{}).get('assessment')=='concerns'):result['status']='review_required'
+  if unaided_call is not None:
+   # Whatever the control has by now: it is collected, never waited on, so a slow
+   # unaided call is missing from the comparison rather than late to the reading.
+   try:
+    unaided=unaided_call.result(timeout=0)
+   except TimeoutError:
+    unaided=None
+    progress.say('the unaided reading is still out when the run ends; nothing to '
+      'compare the scaffolding against on this page')
+   except Exception as error:
+    unaided=None
+    progress.say('the unaided reading came back unusable: '+str(error))
+   unaided_pool.shutdown(wait=False,cancel_futures=True)
+   if unaided is not None:
+    against=unsteered.compare(unaided,result.get('rows') or [])
+    unsteered.write(out/'unsteered_reading.json',unaided)
+    unsteered.write(out/'unsteered_comparison.json',against)
+    result['unsteered']={'reading':str(out/'unsteered_reading.json'),**against}
+    progress.say(unsteered.summary(unaided))
+    progress.say(against['reading'])
+    progress.emit('unsteered',**against,series=[
+      {'label':s.get('label') or s.get('id'),'points':(s.get('points') or [])[:200]}
+      for s in (unaided.get('series') or [])[:20]])
   result['visual_checks']=[str(p) for p in sorted((out/'visual_checks').rglob('*.png'))]
   write_json(out/'result.json',result)
   write_json(result['json_path'],result)
