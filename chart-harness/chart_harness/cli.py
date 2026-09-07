@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 import shutil
+import statistics
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
@@ -27,6 +28,7 @@ from . import gaps
 from . import duel
 from . import frame_fit
 from . import panel_fit
+from . import reading_fit
 from .consensus import compare
 from .coordinate_grid import coordinate_grid
 from .visual_check import VisualCheckProvider
@@ -584,6 +586,37 @@ def run(args):
     progress.emit('detected_marks',count=0,counts_by_method=bank['counts'],
       marks_suggested=0,crowded=0,corroborated=0,
       reason='no legend glyphs and no finder located a mark-shaped body in the plot')
+  # A reader answers in the pixel space it was shown, and an endpoint that
+  # shrinks a big scan before the model sees it hands back a reading that starts
+  # at the plot's corner and then falls short of it - every point high, nothing
+  # reaching the right-hand edge. Measured against the marks python found, that
+  # is one stretch of the frame rather than dozens of separate misses, so the
+  # reading is registered onto them before anything is refined.
+  if config.get('register_reading_to_marks',True):
+   marks_for_fit=(early_bank.get('bank') or bank or {}).get('pooled') or []
+   seeds=[(s['id'],i,seed) for s in interpretation.get('series',[])
+          for i,seed in enumerate(s.get('seeds',[]) or [])
+          if isinstance(seed,dict) and 'x' in seed and 'y' in seed]
+   glyphs=[max(float(s['template_bbox'][2])-float(s['template_bbox'][0]),
+               float(s['template_bbox'][3])-float(s['template_bbox'][1]))
+           for s in interpretation.get('series',[]) if s.get('template_bbox')]
+   widths=[m.get('width') for m in marks_for_fit if m.get('width')]
+   reach=(statistics.median(glyphs) if glyphs else
+          statistics.median(widths) if widths else None)
+   frame=reading_fit.register([(s[2]['x'],s[2]['y']) for s in seeds],
+     [(m['x'],m['y']) for m in marks_for_fit],reach,
+     bounds=interpretation.get('plot_bbox')) if seeds and reach else None
+   if frame:
+    for _,_,seed in seeds:
+     was={'x':seed['x'],'y':seed['y']}
+     seed['x'],seed['y']=reading_fit.carry(frame,seed['x'],seed['y'])
+     seed['moved_into_the_measured_frame']=was
+    write_json(out/'reading_frame.json',frame)
+    write_json(out/'interpretation.json',interpretation)
+    progress.say('the reading was drawn in a different frame from the page: '
+      'stretched onto the measured marks, it lands on {n} of them where it '
+      'landed on {b}'.format(n=frame['landed_on_marks'],b=frame['landed_before']))
+    progress.emit('reading_frame',**frame)
   proposals=stage('proposals',lambda:geometry.analyze(out/'working.png',interpretation,out/'geometry'))
   # A proposal is only meaningful as a reading of the figure, so it is reported in
   # the figure's own units and against the group it was attributed to; the pixels
