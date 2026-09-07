@@ -38,7 +38,10 @@ class VisualTests(unittest.TestCase):
    self.assertEqual(result['series'][0]['seeds'],[{'x':50,'y':40}])
    self.assertTrue((root/'interpret.failure.json').exists())
  def test_independent_center_disagreement_and_missing_center(self):
-  proposals={'candidates':[{'candidate_id':'p','pixel':{'x':300.46,'y':513.10}}]}
+  # Agreement is judged against the measured size of this mark, so the same
+  # code holds a 3 px dot and a 40 px ring to proportionate standards.
+  proposals={'candidates':[{'candidate_id':'p','pixel':{'x':300.46,'y':513.10},
+    'diagnostics':{'rx':4.,'ry':4.}}]}
   for center in [None,{'x':318.04,'y':538.10}]:
    d={'candidate_id':'p','role':'observed','reason':'visible'}
    if center:d['marker_center']=center
@@ -46,3 +49,11 @@ class VisualTests(unittest.TestCase):
    self.assertEqual(r['decisions'][0]['role'],'unresolved')
   r=enforce_marker_centers({'status':'accepted','decisions':[{'candidate_id':'p','role':'observed','marker_center':{'x':300.5,'y':513.1}}]},proposals)
   self.assertEqual(r['decisions'][0]['role'],'observed')
+ def test_a_mark_of_unknown_size_cannot_be_agreed_with(self):
+  # Nothing measured the mark, so there is no scale to judge the reader's
+  # centre against and the decision is not allowed to stand as an observation.
+  proposals={'candidates':[{'candidate_id':'p','pixel':{'x':10.,'y':10.}}]}
+  r=enforce_marker_centers({'status':'accepted','decisions':[
+    {'candidate_id':'p','role':'observed','marker_center':{'x':10.,'y':10.}}]},proposals)
+  self.assertEqual(r['decisions'][0]['role'],'unresolved')
+  self.assertIsNone(r['marker_center_checks'][0]['tolerance_px'])

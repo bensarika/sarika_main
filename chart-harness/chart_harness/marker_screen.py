@@ -58,11 +58,21 @@ def _glyph_ink(gray, template_bbox):
     return max(1, int((patch < markers.INK_LEVEL).sum()))
 
 
-SNAP_LIMIT_PX = 12.
+# How far a coordinate may be moved onto the match python found is measured in
+# glyphs, not pixels: a correction shorter than the mark itself is the same mark
+# read slightly off centre, while a longer one is a different mark. The glyph is
+# cut from this figure's own legend, so the limit follows the figure's scale.
+SNAP_LIMIT_IN_GLYPHS = 1.
+
+
+def _glyph_size(template_bbox):
+    box = [float(v) for v in template_bbox]
+    return max(box[2] - box[0], box[3] - box[1])
 
 
 def apply(image_path, interpretation, proposals, review, min_ncc=None,
-          min_ink_ratio=.5, snap_limit_px=SNAP_LIMIT_PX):
+          min_ink_ratio=.5, snap_limit_px=None,
+          snap_limit_in_glyphs=SNAP_LIMIT_IN_GLYPHS):
     """Correct or demote decisions whose window fails the legend glyph check.
 
     A near miss is moved onto the measured match by Python and re-verified; a
@@ -98,10 +108,13 @@ def apply(image_path, interpretation, proposals, review, min_ncc=None,
                 moved = markers.patch_report(gray, template, advice['x'], advice['y'])
                 recheck = markers.verdict(moved, min_ncc=threshold,
                                           min_ink_ratio=min_ink_ratio)
-                if recheck['passed'] and advice['distance_px'] <= snap_limit_px:
+                limit = (snap_limit_px if snap_limit_px is not None
+                         else _glyph_size(template) * snap_limit_in_glyphs)
+                if recheck['passed'] and advice['distance_px'] <= limit:
                     candidate['pixel'] = {'x': advice['x'], 'y': advice['y']}
                     candidate.setdefault('diagnostics', {})['snapped_to_glyph_match'] = {
-                        'from': pixel, 'distance_px': advice['distance_px']}
+                        'from': pixel, 'distance_px': advice['distance_px'],
+                        'limit_px': limit, 'glyph_size_px': _glyph_size(template)}
                     entry.update({'pixel': candidate['pixel'], 'corrected': True,
                                   'measurements': moved, **recheck})
                     screens.append(entry)

@@ -9,7 +9,11 @@ import math
 from pathlib import Path
 
 VALUE_TOLERANCE = 0.05
-PIXEL_TOLERANCE = 6.0
+# Two readers' anchors agree when they name the same tick, so the question is
+# always "closer than a fraction of a tick apart?" - a length the figure states
+# itself through its own anchor spacing, rather than a pixel count that means
+# different things on a thumbnail and on a plate scan.
+ANCHOR_AGREEMENT_FRACTION_OF_SPACING = 0.25
 
 
 def _load(run_dir):
@@ -35,16 +39,28 @@ def _axis_summary(interpretation, name):
             'anchor_values': [a.get('value') for a in anchors]}
 
 
+def _spacing(pixels):
+    """The closest two anchors on this axis: the length the axis is drawn in."""
+    ordered = sorted(pixels)
+    gaps = [b - a for a, b in zip(ordered, ordered[1:]) if b > a]
+    return min(gaps) if gaps else None
+
+
 def _compare_axes(left, right, pixel_tolerance):
     axes = {}
     for name in ('x_axis', 'y_axis'):
         a, b = _axis_summary(left['interpretation'], name), _axis_summary(right['interpretation'], name)
         offsets = [min((abs(p - q) for q in b['anchor_pixels']), default=None) for p in a['anchor_pixels']]
         measured = [o for o in offsets if o is not None]
-        agrees = (a['scale'] == b['scale'] and bool(measured)
-                  and max(measured) <= pixel_tolerance and a['anchor_values'] == b['anchor_values'])
+        spacings = [s for s in (_spacing(a['anchor_pixels']), _spacing(b['anchor_pixels'])) if s]
+        spacing = min(spacings) if spacings else None
+        tolerance = pixel_tolerance if pixel_tolerance is not None else (
+            None if spacing is None else spacing * ANCHOR_AGREEMENT_FRACTION_OF_SPACING)
+        agrees = (a['scale'] == b['scale'] and bool(measured) and tolerance is not None
+                  and max(measured) <= tolerance and a['anchor_values'] == b['anchor_values'])
         axes[name] = {'left': a, 'right': b, 'agrees': agrees,
-                      'max_anchor_offset_px': max(measured) if measured else None}
+                      'max_anchor_offset_px': max(measured) if measured else None,
+                      'anchor_spacing_px': spacing, 'tolerance_px': tolerance}
     return axes
 
 
@@ -76,7 +92,7 @@ def _compare_points(left, right, value_tolerance):
             'accepted_only_by_right': [{'series': _key(r), 'x': r.get('x'), 'y': r.get('y')} for r in unmatched_right]}
 
 
-def compare(left_dir, right_dir, value_tolerance=VALUE_TOLERANCE, pixel_tolerance=PIXEL_TOLERANCE):
+def compare(left_dir, right_dir, value_tolerance=VALUE_TOLERANCE, pixel_tolerance=None):
     left, right = _load(left_dir), _load(right_dir)
     points = _compare_points(left, right, value_tolerance)
     axes = _compare_axes(left, right, pixel_tolerance)
@@ -86,7 +102,9 @@ def compare(left_dir, right_dir, value_tolerance=VALUE_TOLERANCE, pixel_toleranc
     for name, axis in axes.items():
         if not axis['agrees']:
             disagreements.append({'code': 'axis_calibration_disagreement', 'axis': name,
-                                  'max_anchor_offset_px': axis['max_anchor_offset_px']})
+                                  'max_anchor_offset_px': axis['max_anchor_offset_px'],
+                                  'tolerance_px': axis['tolerance_px'],
+                                  'anchor_spacing_px': axis['anchor_spacing_px']})
     if series['left'] != series['right']:
         disagreements.append({'code': 'series_label_disagreement', **series})
     for match in points['matched']:
@@ -104,6 +122,10 @@ def compare(left_dir, right_dir, value_tolerance=VALUE_TOLERANCE, pixel_toleranc
             'axes': axes, 'series': series, 'points': points,
             'disagreements': disagreements,
             'agrees': not disagreements,
-            'tolerances': {'relative_value': value_tolerance, 'anchor_pixels': pixel_tolerance},
+            'tolerances': {'relative_value': value_tolerance,
+                           'anchor_pixels': pixel_tolerance,
+                           'anchor_fraction_of_spacing': (
+                               None if pixel_tolerance is not None
+                               else ANCHOR_AGREEMENT_FRACTION_OF_SPACING)},
             'note': ('Agreement between independent readers is evidence for review only. '
                      'Shared bias, shared source degradation, and identical misreadings are not detected here.')}

@@ -15,8 +15,16 @@ from PIL import Image
 
 DARK_THRESHOLD = 128
 MIN_AXIS_COVERAGE = 0.25
-TICK_BAND_PX = 16
-TICK_MIN_LENGTH = 4
+# Nothing here is measured in absolute pixels: a tick is a short stroke drawn
+# against the rule, and how many pixels short means depends entirely on how large
+# the figure was rendered. The band searched for ticks, the stroke length that
+# counts as one, and the gap skipped over the rule itself are all fractions of
+# the figure's own dimensions or of the measured thickness of the rule.
+TICK_BAND_FRACTION = 0.02
+TICK_MIN_LENGTH_FRACTION = 0.25
+# Anchors are compared against the printed ticks at a fraction of the spacing
+# between those ticks, so the same criterion holds for a thumbnail and a poster.
+TICK_AGREEMENT_FRACTION_OF_SPACING = 0.25
 
 
 def _binary(image_path):
@@ -44,6 +52,17 @@ def _tick_centers(band, minimum_length):
     return [(start + stop - 1) / 2.0 for start, stop in _runs(lengths >= minimum_length)]
 
 
+def _rule_span(counts, index):
+    """Extent of the rule at index: the neighbouring lines that are nearly as inked."""
+    peak = counts[index]
+    low, high = index, index
+    while low > 0 and counts[low - 1] >= peak * 0.5:
+        low -= 1
+    while high + 1 < len(counts) and counts[high + 1] >= peak * 0.5:
+        high += 1
+    return low, high
+
+
 def detect_ticks(image_path):
     """Locate the x and y axis rules and the tick centers printed against them."""
     mask = _binary(image_path)
@@ -55,25 +74,45 @@ def detect_ticks(image_path):
                 'y_axis_col': None if y_axis_col is None else int(y_axis_col),
                 'x_tick_pixels': [], 'y_tick_pixels': []}
     if x_axis_row is not None:
-        below = mask[x_axis_row + 3:min(height, x_axis_row + 3 + TICK_BAND_PX), :]
-        above = mask[max(0, x_axis_row - 2 - TICK_BAND_PX):max(0, x_axis_row - 2), :]
-        outward = _tick_centers(below, TICK_MIN_LENGTH)
-        detected['x_tick_pixels'] = outward or _tick_centers(above, TICK_MIN_LENGTH)
+        band = max(2, int(round(height * TICK_BAND_FRACTION)))
+        minimum = max(1, int(round(band * TICK_MIN_LENGTH_FRACTION)))
+        top, bottom = _rule_span(mask.sum(axis=1), x_axis_row)
+        below = mask[bottom + 1:min(height, bottom + 1 + band), :]
+        above = mask[max(0, top - band):max(0, top), :]
+        outward = _tick_centers(below, minimum)
+        detected['x_tick_pixels'] = outward or _tick_centers(above, minimum)
         detected['x_ticks_outward'] = bool(outward)
+        detected['x_tick_band_px'] = band
     if y_axis_col is not None:
-        left = mask[:, max(0, y_axis_col - 2 - TICK_BAND_PX):max(0, y_axis_col - 2)]
-        right = mask[:, y_axis_col + 3:min(width, y_axis_col + 3 + TICK_BAND_PX)]
-        outward = _tick_centers(left.T, TICK_MIN_LENGTH)
-        detected['y_tick_pixels'] = outward or _tick_centers(right.T, TICK_MIN_LENGTH)
+        band = max(2, int(round(width * TICK_BAND_FRACTION)))
+        minimum = max(1, int(round(band * TICK_MIN_LENGTH_FRACTION)))
+        first, last = _rule_span(mask.sum(axis=0), y_axis_col)
+        left = mask[:, max(0, first - band):max(0, first)]
+        right = mask[:, last + 1:min(width, last + 1 + band)]
+        outward = _tick_centers(left.T, minimum)
+        detected['y_tick_pixels'] = outward or _tick_centers(right.T, minimum)
         detected['y_ticks_outward'] = bool(outward)
+        detected['y_tick_band_px'] = band
     return detected
 
 
-def _match(anchors, tick_pixels, tolerance):
+def spacing(tick_pixels):
+    """The closest distance between two printed ticks: this axis's resolution."""
+    ordered = sorted(float(t) for t in tick_pixels)
+    gaps = [b - a for a, b in zip(ordered, ordered[1:]) if b > a]
+    return min(gaps) if gaps else None
+
+
+def _match(anchors, tick_pixels, tolerance=None):
     if not anchors:
         return {'checked': False, 'reason': 'no model anchors'}
     if not tick_pixels:
         return {'checked': False, 'reason': 'no ticks detected'}
+    gap = spacing(tick_pixels)
+    if tolerance is None:
+        if gap is None:
+            return {'checked': False, 'reason': 'a single tick gives no spacing to judge against'}
+        tolerance = gap * TICK_AGREEMENT_FRACTION_OF_SPACING
     offsets = []
     for anchor in anchors:
         pixel = float(anchor['pixel'])
@@ -82,12 +121,17 @@ def _match(anchors, tick_pixels, tolerance):
                         'nearest_tick_pixel': nearest, 'offset_px': nearest - pixel})
     worst = max(abs(o['offset_px']) for o in offsets)
     return {'checked': True, 'agrees': worst <= tolerance, 'max_offset_px': worst,
-            'tolerance_px': tolerance, 'detected_tick_pixels': tick_pixels,
-            'offsets': offsets}
+            'tolerance_px': tolerance, 'tick_spacing_px': gap,
+            'offset_fraction_of_spacing': None if not gap else worst / gap,
+            'detected_tick_pixels': tick_pixels, 'offsets': offsets}
 
 
-def crosscheck(image_path, interpretation, tolerance_px):
-    """Compare model axis anchors against detected tick positions."""
+def crosscheck(image_path, interpretation, tolerance_px=None):
+    """Compare model axis anchors against detected tick positions.
+
+    With no tolerance given, each axis is judged against its own printed tick
+    spacing, which is what the figure itself can resolve.
+    """
     detected = detect_ticks(Path(image_path))
     axes = {'x_axis': detected['x_tick_pixels'], 'y_axis': detected['y_tick_pixels']}
     report = {'detected': detected, 'axes': {}, 'tolerance_px': tolerance_px}
@@ -184,7 +228,10 @@ If the labels are unreadable, status must be unresolved. Do not guess or run cod
 
 
 INDEX_SEARCH = 3
-FIT_TOLERANCE_PX = 1.
+# A tick assignment is straight enough when its worst residual is small next to
+# the spacing of the ticks it is assigning, which is the only length in the
+# figure that means anything here.
+FIT_RESIDUAL_FRACTION_OF_SPACING = 0.05
 
 
 def _fit_residual(anchors, scale):
@@ -204,7 +251,7 @@ def _fit_residual(anchors, scale):
     return max(abs(slope * v + intercept - p) for v, p in zip(values, pixels))
 
 
-def _refit_indices(anchors, ticks, scale, span):
+def _refit_indices(anchors, ticks, scale, span, limit):
     """Search near the reader's tick indices for a collinear assignment.
 
     Readers miscount long tick lists by an index or two, which is a large pixel
@@ -229,12 +276,12 @@ def _refit_indices(anchors, ticks, scale, span):
             key = (round(residual, 6), sum(abs(o) for o in offsets))
             if best is None or key < best[0]:
                 best = (key, picked)
-    if best is None or best[0][0] > FIT_TOLERANCE_PX:
+    if best is None or best[0][0] > limit:
         return None
     return best[1]
 
 
-def resolve_tick_indices(axis_check, detected, tolerance_px):
+def resolve_tick_indices(axis_check, detected, tolerance_px=None):
     """Turn reviewer anchors that name measured ticks into measured pixels.
 
     A reader reports coordinates in whatever rendering it was shown, so its raw
@@ -253,6 +300,10 @@ def resolve_tick_indices(axis_check, detected, tolerance_px):
         resolved[name] = axis
         if not ticks:
             continue
+        gap = spacing(ticks)
+        snap = tolerance_px if tolerance_px is not None else (
+            None if gap is None else gap * TICK_AGREEMENT_FRACTION_OF_SPACING)
+        straight = None if gap is None else gap * FIT_RESIDUAL_FRACTION_OF_SPACING
         anchors = []
         named = []
         for anchor in axis.get('anchors', []):
@@ -265,17 +316,17 @@ def resolve_tick_indices(axis_check, detected, tolerance_px):
                 continue
             if isinstance(pixel, (int, float)):
                 nearest = min(ticks, key=lambda t: abs(t - pixel))
-                if abs(nearest - pixel) <= tolerance_px:
+                if snap is not None and abs(nearest - pixel) <= snap:
                     anchors.append({'pixel': nearest, 'value': value})
                     continue
                 dropped.append({'axis': name, 'pixel': float(pixel), 'value': value,
                                 'nearest_tick_pixel': nearest})
             else:
                 dropped.append({'axis': name, 'tick_index': index, 'value': value})
-        if len(named) == len(anchors) >= 2:
+        if len(named) == len(anchors) >= 2 and straight is not None:
             residual = _fit_residual(anchors, axis.get('scale'))
-            if residual is None or residual > FIT_TOLERANCE_PX:
-                refit = _refit_indices(named, ticks, axis.get('scale'), INDEX_SEARCH)
+            if residual is None or residual > straight:
+                refit = _refit_indices(named, ticks, axis.get('scale'), INDEX_SEARCH, straight)
                 if refit is None:
                     dropped.append({'axis': name, 'reason': 'named ticks do not fit the stated scale',
                                     'anchors': anchors})
@@ -290,13 +341,18 @@ def resolve_tick_indices(axis_check, detected, tolerance_px):
     return {**axis_check, **resolved}, dropped
 
 
-def apply_repair(interpretation, repaired, detected, tolerance_px):
+def apply_repair(interpretation, repaired, detected, tolerance_px=None):
     """Replace anchors with detected-tick anchors the reader could label."""
     applied = {}
     for name in ('x_axis', 'y_axis'):
         proposed = repaired.get(name)
         ticks = detected['x_tick_pixels' if name == 'x_axis' else 'y_tick_pixels']
         if not isinstance(proposed, dict) or not ticks:
+            continue
+        gap = spacing(ticks)
+        snap = tolerance_px if tolerance_px is not None else (
+            None if gap is None else gap * TICK_AGREEMENT_FRACTION_OF_SPACING)
+        if snap is None:
             continue
         anchors = []
         for anchor in proposed.get('anchors', []):
@@ -305,7 +361,7 @@ def apply_repair(interpretation, repaired, detected, tolerance_px):
             if not isinstance(pixel, (int, float)) or not isinstance(value, (int, float)):
                 continue
             nearest = min(ticks, key=lambda t: abs(t - pixel))
-            if abs(nearest - pixel) <= tolerance_px:
+            if abs(nearest - pixel) <= snap:
                 anchors.append({'pixel': nearest, 'value': value})
         unique = {a['pixel']: a for a in anchors}
         if len(unique) < 2:

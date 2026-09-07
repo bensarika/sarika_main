@@ -23,6 +23,26 @@ def listening(sink):
         _sink.reset(token)
 
 
+def bound(function):
+    """Carry the current listener into a worker thread.
+
+    A thread starts with an empty context, so work handed to a pool would emit
+    into nothing and the watcher would see a run go silent exactly while the
+    parallel stages are the busiest. The sink is captured here and re-set inside
+    the worker; copying the whole context instead would fail, because one context
+    cannot be entered by two threads at once.
+    """
+    sink = _sink.get()
+
+    def run(*args, **kwargs):
+        token = _sink.set(sink)
+        try:
+            return function(*args, **kwargs)
+        finally:
+            _sink.reset(token)
+    return run
+
+
 def emit(kind, **fields):
     """Report that something happened. Never raises into the pipeline."""
     sink = _sink.get()

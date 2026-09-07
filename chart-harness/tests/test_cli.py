@@ -72,6 +72,20 @@ class CLITests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'different input/config'):
             run(args)
 
+    def test_a_spent_time_budget_stops_asking_and_the_reading_is_not_accepted(self):
+        """A dozen calls of 300s each is not a five-minute run."""
+        self.config.write_text(json.dumps({'model':{'name':'fixture','base_url':'http://localhost:1'},
+            'recheck_axes':False,'run_budget_s':0}))
+        with patch('chart_harness.cli.make_provider',side_effect=self.provider):
+            result=run(self.args('outoftime'))
+        self.assertEqual('review_required',result['status'])
+        self.assertEqual(0,result['counts']['observed'])
+        self.assertIn('review_batch_000',result['time_budget']['stages_skipped'])
+        self.assertIn('final_visual_check',result['time_budget']['stages_skipped'])
+        self.assertIn({'code':'run_time_budget_spent','stages_skipped':result['time_budget']['stages_skipped']},
+                      result['diagnostics'])
+        self.assertNotIn('review_batch_000',self.calls)
+
     def test_batch_exports_source_pixels_and_refuses_reuse_for_changed_request(self):
         args=self.args('batch')
         with patch('chart_harness.cli.make_provider',side_effect=self.provider):

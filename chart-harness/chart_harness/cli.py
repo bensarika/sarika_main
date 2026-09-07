@@ -5,7 +5,9 @@ import json
 import math
 from pathlib import Path
 import shutil
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 from PIL import Image
@@ -18,13 +20,14 @@ from .provider import ModelConfig,Provider,ReplayProvider,ExchangeProvider,Pendi
 from .audit import usage_report, export_batch
 from .calibration import recheck_packet
 from . import axis_detect
+from . import detectors
 from . import doc_context
 from . import duel
 from . import frame_fit
 from .consensus import compare
 from .coordinate_grid import coordinate_grid
 from .visual_check import VisualCheckProvider
-from .review_validation import enforce_marker_centers
+from .review_validation import CENTER_FRACTION_OF_MARK,enforce_marker_centers
 from . import review_batches
 from . import markers
 from . import marker_screen
@@ -134,6 +137,20 @@ def run(args):
  state_path=out/'state.json'
  state=json.loads(state_path.read_text()) if state_path.exists() else {'run_signature':signature,'source':str(source),'stages':{}}
  if state['run_signature']!=signature:raise ValueError('Output directory belongs to a different input/config; choose a new --out')
+ # A per-call timeout bounds one exchange; a figure costs a dozen of them, so the
+ # wall clock is bounded here as well. When it is spent the harness stops asking
+ # for more opinions and finalizes what the pixels already support: unreviewed
+ # candidates keep no decision and the run cannot be reported as accepted.
+ budget=config.get('run_budget_s',300)
+ skipped=[]
+ def over_budget():return budget is not None and time.monotonic()-start>=budget
+ def unless_out_of_time(name,fn,default):
+  if over_budget():
+   skipped.append(name)
+   progress.emit('stage',stage=name,state='skipped',reason='run time budget spent')
+   return default
+  return stage(name,fn)
+ state_lock=threading.Lock()
  def stage(name,fn):
   p=out/(name+'.json')
   if name in state['stages'] and p.exists():
@@ -145,9 +162,11 @@ def run(args):
    # Re-render via the same provider/cache if the mandatory image was removed or changed.
   progress.emit('stage',stage=name,state='started')
   began=time.monotonic();value=fn();write_json(p,value)
-  state['stages'][name]={'path':str(p),'wall_seconds':time.monotonic()-began}
   progress.emit('stage',stage=name,state='finished',seconds=round(time.monotonic()-began,1),path=str(p))
-  write_json(state_path,state);return value
+  with state_lock:
+   state['stages'][name]={'path':str(p),'wall_seconds':time.monotonic()-began}
+   write_json(state_path,state)
+  return value
  context=source_context(args,config,source)
  try:
   page=args.page;rotation=args.rotate
@@ -178,6 +197,10 @@ def run(args):
       'working_image':str(out/'working.png'),'working_to_page_raster':affine.tolist(),
       'crop':info,'page_raster_size':raster_size})
   with Image.open(out/'working.png') as image:size=image.size
+  # Everything downstream is stated in these pixels, so the viewer is shown the
+  # very image the readers are given, not the file as uploaded.
+  progress.emit('image',path=str(out/'working.png'),width=size[0],height=size[1],
+    page=page,rotation=rotation)
   interpreter=make_provider(config,out,'model')
   references=[Path(p) for p in (getattr(args,'reference_images',[]) or ([args.reference_image] if getattr(args,'reference_image',None) else []))]
   if config.get('coordinate_grid',False):
@@ -195,7 +218,9 @@ def run(args):
     unresolved_regions=interpretation.get('unresolved_regions',[]),
     image=str(out/'working.png'))
   if not interpretation.get('unsupported') and config.get('detect_ticks',True):
-   tick_tolerance=config.get('axis_tick_tolerance_px',6.)
+   # No tolerance is stated: each axis is judged against the spacing of its own
+   # printed ticks, so the same rule holds for a thumbnail and a plate scan.
+   tick_tolerance=config.get('axis_tick_tolerance_px')
    check=axis_detect.crosscheck(out/'working.png',interpretation,tick_tolerance)
    if not check['agrees'] and not check['inconclusive'] and config.get('repair_axes_from_ticks',True):
     prompt,tick_images=axis_detect.repair_packet(out/'working.png',check['detected'],out/'tick_repair')
@@ -226,6 +251,10 @@ def run(args):
      write_json(out/'interpretation.json',interpretation)
    interpretation['axis_tick_check']=check
    write_json(out/'axis_tick_check.json',check)
+   progress.emit('axes',plot_bbox=interpretation.get('plot_bbox'),
+     x_ticks=check['detected'].get('x_tick_pixels',[]),y_ticks=check['detected'].get('y_tick_pixels',[]),
+     agrees=check.get('agrees'),inconclusive=check.get('inconclusive'),
+     x_axis=interpretation.get('x_axis'),y_axis=interpretation.get('y_axis'))
   # The legend is the one place a marker is guaranteed unobstructed, so its
   # pixels, not a reader's box, define what each series looks like.
   if not interpretation.get('unsupported') and config.get('legend_templates',True):
@@ -259,28 +288,43 @@ def run(args):
   # paper cannot then be confirmed by mining around those same coordinates. The
   # marks seed every series, so which group each belongs to stays an open question
   # for the reviewer instead of being decided by the detector.
+  # Several independent finders run at once - ink thickness, printed colour, a
+  # shape pass over the whole plot, bar tops, and following the curves - because
+  # no one of them reads every figure. Their hits are pooled and a location more
+  # than one of them found is recorded as corroborated.
   if (config.get('detect_marks_without_legend',True)
       and not any(s.get('template_bbox') for s in interpretation['series'])):
-   found=markers.detect_marks(out/'working.png',interpretation['plot_bbox'])
-   if found:
+   bank=detectors.run_all(out/'working.png',interpretation['plot_bbox'],
+     outdir=out/'legend'/'mined',methods=config.get('detection_methods'))
+   found=bank['methods'].get('thickness',{}).get('marks') or []
+   pooled=bank['pooled']
+   if pooled:
     lone=min((m for m in found if not m['crowded']),key=lambda m:m['width']*m['height'],default=None)
-    write_json(out/'detected_marks.json',{'source':'thickness_cores','count':len(found),
-      'marks_suggested':sum(m['marks_suggested'] for m in found),'marks':found})
+    write_json(out/'detected_marks.json',{'source':'detector_bank','count':len(pooled),
+      'counts_by_method':bank['counts'],'corroborated':bank['corroborated'],
+      'corroboration_radius_px':bank['corroboration_radius_px'],
+      'marks_suggested':sum(m['marks_suggested'] for m in found),
+      'marks':found,'pooled':pooled})
     for series in interpretation['series']:
      series['marker']='blob'
-     series['seeds']=[{'x':m['x'],'y':m['y']} for m in found]
+     series['seeds']=[{'x':m['x'],'y':m['y'],'found_by':m['found_by']} for m in pooled]
      if lone:
       series['template_bbox']=lone['bbox']
       series['legend_glyph']={'template_path':None,'width':lone['width'],'height':lone['height'],
                               'ink_fraction':None,'mined_from_plot':True}
     write_json(out/'interpretation.json',interpretation)
-    progress.emit('detected_marks',count=len(found),
+    progress.emit('detected_marks',count=len(pooled),counts_by_method=bank['counts'],
+      corroborated=bank['corroborated'],
       marks_suggested=sum(m['marks_suggested'] for m in found),
       crowded=sum(1 for m in found if m['crowded']),
-      reason='no legend glyphs; marks located by ink thickness, group attribution left open')
+      marks=[{k:m[k] for k in ('x','y','found_by','method_count','width')} for m in pooled[:400]],
+      plot_bbox=interpretation['plot_bbox'],
+      reason='no legend glyphs; marks located by several independent finders, '
+             'group attribution left open')
    else:
-    progress.emit('detected_marks',count=0,marks_suggested=0,crowded=0,
-      reason='no legend glyphs and no marker-sized ink bodies in the plot')
+    progress.emit('detected_marks',count=0,counts_by_method=bank['counts'],
+      marks_suggested=0,crowded=0,corroborated=0,
+      reason='no legend glyphs and no finder located a mark-shaped body in the plot')
   proposals=stage('proposals',lambda:geometry.analyze(out/'working.png',interpretation,out/'geometry'))
   # A proposal is only meaningful as a reading of the figure, so it is reported in
   # the figure's own units and against the group it was attributed to; the pixels
@@ -332,7 +376,7 @@ def run(args):
        schema=REVIEW_AXES_SCHEMA))
   if detected and isinstance(axes_review.get('axis_check'),dict):
    axis_check,dropped=axis_detect.resolve_tick_indices(axes_review['axis_check'],detected,
-     config.get('axis_tick_tolerance_px',6.))
+     config.get('axis_tick_tolerance_px'))
    axes_review={**axes_review,'axis_check':axis_check}
    if dropped:axes_review['notes']=list(axes_review.get('notes',[]))+[
      f'review anchors ignored, they name no measured tick: {json.dumps(dropped)}']
@@ -342,7 +386,7 @@ def run(args):
     padding_px=config.get('review_batch_padding_px',review_batches.PADDING_PX),
     min_side=config.get('review_batch_min_side_px',review_batches.MIN_SIDE))
   write_json(out/'review_batches.json',batches)
-  parts=[]
+  jobs=[]
   gray=markers.load_gray(out/'working.png') if config.get('screen_candidates_against_legend',True) else None
   templates={s['id']:s['template_bbox'] for s in interpretation['series'] if s.get('template_bbox')}
   by_candidate={c['candidate_id']:c for c in proposals['candidates']}
@@ -350,15 +394,22 @@ def run(args):
    crop_path=review_batches.crop(out/'working.png',batch,out/'review_batches')
    with Image.open(crop_path) as im:crop_size=im.size
    measurements=marker_screen.batch_feedback(gray,templates,batch,by_candidate) if gray is not None else None
-   parts.append(stage(f"review_batch_{batch['index']:03d}",
+   jobs.append((f"review_batch_{batch['index']:03d}",
      lambda batch=batch,crop_path=crop_path,crop_size=crop_size,measurements=measurements:reviewer.complete(
        f"review_batch_{batch['index']:03d}",
        review_batch_prompt(batch,labels,crop_size,context,measurements,
          config.get('judging_provider_label')),
        images=[crop_path],schema=REVIEW_BATCH_SCHEMA)))
+  # The crops are independent of one another, so the wall clock buys as many of
+  # them as the endpoint will take at once; results stay in batch order.
+  missed={'decisions':[],'notes':['batch not reviewed: run time budget spent']}
+  workers=max(1,int(config.get('parallel_calls',4)))
+  with ThreadPoolExecutor(max_workers=min(workers,max(1,len(jobs)))) as pool:
+   parts=list(pool.map(progress.bound(lambda job:unless_out_of_time(job[0],job[1],missed)),jobs))
   review=review_batches.merge(axes_review,parts,batches)
   write_json(out/'review.json',review)
-  review=enforce_marker_centers(review,proposals,config.get('review_center_tolerance_px',2.0))
+  review=enforce_marker_centers(review,proposals,
+    config.get('review_center_fraction_of_mark',CENTER_FRACTION_OF_MARK))
   write_json(out/'review_center_checks.json',review.get('marker_center_checks',[]))
   # Review uses printed labels, rather than inheriting the first reader's assignments.
   label_to_id={s['label']:s['id'] for s in interpretation['series']}
@@ -385,8 +436,8 @@ def run(args):
       not all(v['accepted'] for v in result['axis_agreement'].values())):
    prompt,tick_images=recheck_packet(out/'working.png',interpretation['plot_bbox'],out/'tick_recheck')
    calibrator=make_provider(config,out,'calibrator')
-   checked=stage('calibration_recheck',lambda:calibrator.complete('calibration_recheck',
-       prompt,images=tick_images+references))
+   checked=unless_out_of_time('calibration_recheck',lambda:calibrator.complete('calibration_recheck',
+       prompt,images=tick_images+references),{'status':'unread'})
    if checked.get('status')=='readable' and isinstance(checked.get('axis_check'),dict):
     revised_review={**review,'axis_check':checked['axis_check']}
     first_agreement=result['axis_agreement']
@@ -402,11 +453,18 @@ def run(args):
   result['model_mode']=config.get('mode',config.get('model',{}).get('mode','api'))
   result['source_sha256']=hashlib.sha256(source.read_bytes()).hexdigest()
   result['wall_seconds_this_invocation']=time.monotonic()-start
+  result['time_budget']={'seconds':budget,'spent':round(time.monotonic()-start,1),'stages_skipped':skipped}
+  if skipped:
+   result['status']='review_required'
+   result.setdefault('diagnostics',[]).append({'code':'run_time_budget_spent','stages_skipped':skipped})
   result['notes']=list(result.get('notes',[]))+[
     'Pixel coordinates refer to working.png. image_manifest.json maps them to the source page raster.',
     'Model agreement and overlay fit do not establish original numerical ground truth.',
     'Missing observations are not reconstructed; unresolved regions prevent whole-chart acceptance.']
-  checked=stage('final_visual_check',lambda:interpreter.check('final_output',result,[out/'working.png']))
+  checked=unless_out_of_time('final_visual_check',
+    lambda:interpreter.check('final_output',result,[out/'working.png']),
+    {'_visual_check':{'assessment':'unavailable','reason':'run time budget spent',
+                      'image_path':str(out/'working.png')}})
   result['_visual_check']=checked['_visual_check']
   if (result['_visual_check']['assessment']=='concerns' or interpretation.get('_visual_check',{}).get('assessment')=='concerns' or review.get('_visual_check',{}).get('assessment')=='concerns'):result['status']='review_required'
   result['visual_checks']=[str(p) for p in sorted((out/'visual_checks').rglob('*.png'))]
@@ -580,9 +638,15 @@ def adjudicate(sides,out,context,rerun):
  first=panel_comparison(sides[0]['dir'],sides[1]['dir'])
  write_json(out/'first_comparison.json',first)
  judgments,decisions,iterations={},{},{}
- for side,other in ((sides[0],sides[1]),(sides[1],sides[0])):
+ def judged(pair):
+  side,other=pair
   judge=make_provider(other['config'],out/'judges'/other['name'],'reviewer')
-  judgments[side['name']]=cross_judge(judge,side['dir'],side['name'],context)
+  return side,other,cross_judge(judge,side['dir'],side['name'],context)
+ # Neither judgment depends on the other, so both are asked at once.
+ with ThreadPoolExecutor(max_workers=2) as pool:
+  verdicts=list(pool.map(progress.bound(judged),((sides[0],sides[1]),(sides[1],sides[0]))))
+ for side,other,judgment in verdicts:
+  judgments[side['name']]=judgment
   judgments[side['name']]['judged_by']=other['name']
   reflection=duel.self_reflection(side['dir'])
   side['reflection']=reflection
@@ -595,19 +659,23 @@ def adjudicate(sides,out,context,rerun):
     reasons=decisions[side['name']]['reasons'])
  write_json(out/'cross_judgments.json',judgments)
  write_json(out/'decisions.json',decisions)
- for side in sides:
+ def second_pass(side):
   decision=decisions[side['name']]
-  if not decision['iterate']:continue
   feedback=out/f"feedback_{side['name']}.md"
   feedback.write_text(context+'\n\n'+duel.feedback_text(decision,judgments[side['name']]))
   directory=out/(side['name']+'_pass2')
   progress.emit('iteration',side=side['name'],state='started',
     feedback=duel.feedback_text(decision,judgments[side['name']]))
-  iterations[side['name']]={'dir':str(directory),'feedback_path':str(feedback),
-    'result':rerun(side,directory,str(feedback))}
+  entry={'dir':str(directory),'feedback_path':str(feedback),
+         'result':rerun(side,directory,str(feedback))}
   side['dir']=directory
   progress.emit('iteration',side=side['name'],state='finished',
-    status=iterations[side['name']]['result'].get('status'))
+    status=entry['result'].get('status'))
+  return side['name'],entry
+ again=[s for s in sides if decisions[s['name']]['iterate']]
+ if again:
+  with ThreadPoolExecutor(max_workers=len(again)) as pool:
+   iterations.update(dict(pool.map(progress.bound(second_pass),again)))
  final=panel_comparison(sides[0]['dir'],sides[1]['dir']) if iterations else first
  report=duel.report({s['name']:{'dir':str(s['dir']),'reflection':s['reflection']} for s in sides},
    first,judgments,decisions,iterations,final)
@@ -617,7 +685,7 @@ def adjudicate(sides,out,context,rerun):
  return report
 
 def duel_run(args):
- """Both readers over one figure, one after the other, then adjudication."""
+ """Both readers over one figure at the same time, then adjudication."""
  out=Path(args.out).resolve();out.mkdir(parents=True,exist_ok=True)
  source=Path(args.source).resolve()
  sides=duel_sides(args.config)
@@ -625,8 +693,14 @@ def duel_run(args):
   return argparse.Namespace(source=str(source),config=side['config_path'],out=str(directory),
     query=args.query,page=args.page,rotate=args.rotate,crop=None,
     context_file=context_file,reference_image=None,reference_images=[])
- for side in sides:
-  side['dir']=out/side['name'];side['result']=batch(batch_args(side,side['dir']))
+ # The readings are independent, and each is bounded by its own run budget, so
+ # the duel costs about one reading's wall clock rather than two.
+ def read(side):
+  side['dir']=out/side['name']
+  side['result']=batch(batch_args(side,side['dir']))
+  return side
+ with ThreadPoolExecutor(max_workers=len(sides)) as pool:
+  sides=list(pool.map(progress.bound(read),sides))
  report=adjudicate(sides,out,source_context(args,sides[0]['config'],source),
    lambda side,directory,context_file:batch(batch_args(side,directory,context_file)))
  print(json.dumps({'agrees':report['agrees'],'iterated':sorted(report['iterations']),

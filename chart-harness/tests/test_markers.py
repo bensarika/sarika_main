@@ -105,11 +105,15 @@ class PatchVerification(unittest.TestCase):
         self.assertAlmostEqual(9.85, advice['distance_px'], delta=2)
 
     def test_crowding_counts_ink_in_widening_windows(self):
-        report = markers.crowding(self.gray, *MARKS[0], glyph_ink=100)
-        self.assertEqual(['200x200', '300x300', '400x400'], list(report))
+        # The windows are so many marks wide, so they follow the figure's scale
+        # instead of asking every plate the same question in pixels.
+        report = markers.crowding(self.gray, *MARKS[0], glyph_ink=100, mark_side=20)
+        self.assertEqual(['100x100', '160x160', '220x220'], list(report))
         sizes = [report[k]['ink_pixels'] for k in report]
         self.assertEqual(sizes, sorted(sizes))
-        self.assertIn('glyph_equivalents', report['200x200'])
+        self.assertIn('glyph_equivalents', report['100x100'])
+        wider = markers.crowding(self.gray, *MARKS[0], mark_side=40)
+        self.assertEqual(['200x200', '320x320', '440x440'], list(wider))
 
 
 def interpretation(template):
@@ -194,7 +198,7 @@ class MinedTemplates(unittest.TestCase):
         self.assertTrue(mined['mined_from_plot'])
         self.assertEqual(len(MARKS), mined['candidates_measured'])
         self.assertTrue(Path(mined['template_path']).exists())
-        self.assertLess(max(mined['width'], mined['height']), markers.MAX_GLYPH_SIDE)
+        self.assertLess(max(mined['width'], mined['height']), markers._length(markers.load_gray(self.image), markers.GLYPH_SIDE_FRACTION, floor=8))
         self.assertGreater(mined['ink_fraction'], .5)
 
     def test_a_mined_target_screens_the_other_proposals_like_a_legend_glyph(self):

@@ -21,8 +21,13 @@ from scipy import ndimage, optimize, signal
 
 SCHEMA_VERSION = 1
 MARKERS = {"ring", "blob", "template", "point"}
-# These acceptance limits are fixed in code, never read from model responses.
-CALIBRATION_PIXEL_TOLERANCE = 2.0
+# Acceptance is relative to what the figure itself resolves, never an absolute
+# pixel count: two pixels is nothing on a 600 dpi page whose ticks stand 200 px
+# apart and hopeless on a thumbnail whose ticks stand 8 px apart. The criterion
+# is a fraction of the closest printed tick spacing, so it carries over to any
+# scan, crop or zoom of the same plot. The fraction is fixed in code, never read
+# from a model response.
+CALIBRATION_RESIDUAL_FRACTION_OF_TICK_GAP = 0.05
 
 
 def _canonical_unit(unit):
@@ -107,8 +112,13 @@ class Axis:
                 raise ValueError(f"{name} calibration fit is not finite or invertible")
             residual_pixels = np.abs(values - fitted) / abs(slope)
             max_residual = float(np.max(residual_pixels))
-            if max_residual > CALIBRATION_PIXEL_TOLERANCE + 1e-9:
-                raise ValueError(f"{name} tick calibration residual {max_residual:.3g} px exceeds fixed {CALIBRATION_PIXEL_TOLERANCE:g} px limit")
+            gap = float(np.min(np.diff(pixels)))
+            limit = gap * CALIBRATION_RESIDUAL_FRACTION_OF_TICK_GAP
+            if max_residual > limit + 1e-9:
+                raise ValueError(
+                    f"{name} tick calibration residual {max_residual:.3g} px is "
+                    f"{max_residual / gap:.1%} of the closest tick spacing "
+                    f"({gap:.3g} px); the anchors do not sit on one scale")
             lo = _number(item.get("pixel_min", pixels[0]), f"{name}.pixel_min")
             hi = _number(item.get("pixel_max", pixels[-1]), f"{name}.pixel_max")
             if lo >= hi:
@@ -120,8 +130,13 @@ class Axis:
                 "pixel_min": lo, "pixel_max": hi, "anchor_count": len(pixels),
                 "slope_in_calibration_space": slope,
                 "max_residual_pixels": max_residual,
-                "residual_limit_pixels": CALIBRATION_PIXEL_TOLERANCE,
+                "closest_tick_spacing_pixels": gap,
+                "residual_fraction_of_tick_spacing": max_residual / gap,
+                "residual_limit_pixels": limit,
             })
+        # What this axis can resolve: the closest spacing between printed ticks.
+        # Every pixel tolerance on this axis is expressed as a fraction of it.
+        self.tick_gap = min(float(np.min(np.diff(ps))) for _, _, ps, _ in self.segments)
         self.segments.sort(key=lambda s: s[0])
         for first, second in zip(self.segments, self.segments[1:]):
             if first[1] >= second[0]:
@@ -549,9 +564,10 @@ def _axis_agreement(axis, independent, pixels, fraction):
         # internal break boundaries and exported data keep their strict domains.
         first, last = calibration.segments[0], calibration.segments[-1]
         segment = None
-        if first[0] - CALIBRATION_PIXEL_TOLERANCE <= p < first[0]:
+        margin = calibration.tick_gap * CALIBRATION_RESIDUAL_FRACTION_OF_TICK_GAP
+        if first[0] - margin <= p < first[0]:
             segment = first
-        elif last[1] < p <= last[1] + CALIBRATION_PIXEL_TOLERANCE:
+        elif last[1] < p <= last[1] + margin:
             segment = last
         if segment is None:
             return None, False
@@ -573,7 +589,8 @@ def _axis_agreement(axis, independent, pixels, fraction):
             "primary_unit": axis.unit, "review_unit": independent.unit,
             "canonical_unit": _canonical_unit(axis.unit), "unit_conversion_performed": False,
             "comparison_space": "log10(data)" if axis.scale == "log" else "data", "tolerance": tolerance,
-            "outer_endpoint_comparison_tolerance_pixels": CALIBRATION_PIXEL_TOLERANCE,
+            "outer_endpoint_comparison_tolerance_pixels": axis.tick_gap * CALIBRATION_RESIDUAL_FRACTION_OF_TICK_GAP,
+            "closest_tick_spacing_pixels": axis.tick_gap,
             "primary_tick_fit": axis.fit_diagnostics, "review_tick_fit": independent.fit_diagnostics,
             "max_difference": maximum if math.isfinite(maximum) else None,
             "domain_mismatch_pixels": unsupported, "checks": differences}
@@ -657,7 +674,16 @@ def finalize(image_path, interpretation, proposals, review, outdir) -> dict:
             if not isinstance(checks, dict) or name not in checks:
                 result["axis_agreement"][name] = {"accepted": False, "reason": "independent_axis_check_missing"}
             else:
-                independent = Axis(checks[name], f"review.{name}")
+                # A second reader may hand back an axis it cannot state properly.
+                # That is a failed check, not a broken run: the reading survives
+                # as unconfirmed rather than the whole figure being lost.
+                try:
+                    independent = Axis(checks[name], f"review.{name}")
+                except ValueError as unusable:
+                    result["axis_agreement"][name] = {"accepted": False,
+                                                      "reason": "independent_axis_check_unusable",
+                                                      "detail": str(unusable)}
+                    continue
                 result["axis_agreement"][name] = _axis_agreement(axis, independent, [c["pixel"][coordinate] for c in candidates], fraction)
         tick_check = interpretation.get("axis_tick_check")
         if isinstance(tick_check, dict) and tick_check.get("agrees"):

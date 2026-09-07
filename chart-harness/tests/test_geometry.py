@@ -86,6 +86,17 @@ class GeometryTests(unittest.TestCase):
         result = finalize(self.image, self.interpretation, p, review, self.root / "different_mass")
         self.assertEqual(result["status"], "review_required")
 
+    def test_an_unusable_independent_axis_fails_the_check_rather_than_the_run(self):
+        p = analyze(self.image, self.interpretation, self.root / "proposal")
+        review = self.review(p)
+        review["axis_check"]["x_axis"]["anchors"] = review["axis_check"]["x_axis"]["anchors"][:1]
+        result = finalize(self.image, self.interpretation, p, review, self.root / "unusable")
+        self.assertEqual(result["status"], "review_required")
+        agreement = result["axis_agreement"]["x_axis"]
+        self.assertFalse(agreement["accepted"])
+        self.assertEqual("independent_axis_check_unusable", agreement["reason"])
+        self.assertTrue(result["axis_agreement"]["y_axis"]["accepted"])
+
     def test_missing_review_and_missing_points_require_review(self):
         p = analyze(self.image, self.interpretation, self.root / "proposal")
         review = self.review(p)
@@ -240,7 +251,7 @@ class GeometryTests(unittest.TestCase):
                 definition = {"scale": scale, "anchors": [
                     {"pixel": p, "value": v} for p, v in zip((0, 50, 100), values)],
                     "calibration_pixel_tolerance": 100, "axis_tolerance_fraction": 1}
-                with self.assertRaisesRegex(ValueError, "fixed 2 px limit"):
+                with self.assertRaisesRegex(ValueError, "of the closest tick spacing"):
                     Axis(definition, "bad_ticks")
 
     def test_noisy_ticks_fit_one_scale_instead_of_warping_between_ticks(self):
@@ -255,8 +266,11 @@ class GeometryTests(unittest.TestCase):
         self.assertAlmostEqual(logarithmic.value(25) / logarithmic.value(0), logarithmic.value(75) / logarithmic.value(50))
 
     def test_comparison_tolerates_only_small_outer_endpoint_disagreement(self):
+        # The endpoint allowance is a fraction of this axis's own tick spacing
+        # (180 px here), not a fixed pixel count, so it follows the figure's scale.
         primary = Axis(self.interpretation["x_axis"], "primary")
-        for shift, accepted in ((.1, True), (2.1, False)):
+        self.assertEqual(180., primary.tick_gap)
+        for shift, accepted in ((.1, True), (primary.tick_gap * .2, False)):
             with self.subTest(shift=shift):
                 definition = copy.deepcopy(self.interpretation["x_axis"])
                 for anchor in definition["anchors"]:

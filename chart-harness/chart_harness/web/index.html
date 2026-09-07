@@ -4,23 +4,36 @@
 <style>
  :root{color-scheme:dark}
  body{margin:0;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0e1013;color:#dfe3e8}
- header{padding:12px 16px;border-bottom:1px solid #23262c;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+ header{padding:10px 16px;border-bottom:1px solid #23262c;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
  h1{font-size:14px;margin:0 12px 0 0;font-weight:600;letter-spacing:.04em}
- input,button{font:inherit;background:#171a1f;color:#dfe3e8;border:1px solid #2b2f36;border-radius:4px;padding:5px 8px}
+ input,button,select{font:inherit;background:#171a1f;color:#dfe3e8;border:1px solid #2b2f36;border-radius:4px;padding:5px 8px}
  button{cursor:pointer;background:#1f6feb;border-color:#1f6feb;color:#fff}
  button:disabled{opacity:.5;cursor:default}
- #sides{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px;padding:12px}
- section{border:1px solid #23262c;border-radius:6px;background:#12151a;min-width:0}
+ #sides{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:12px;padding:12px}
+ section{border:1px solid #23262c;border-radius:6px;background:#12151a;min-width:0;display:flex;flex-direction:column}
  section>h2{margin:0;padding:8px 12px;font-size:13px;border-bottom:1px solid #23262c;display:flex;justify-content:space-between;gap:8px}
  .status{font-weight:400;color:#8b949e}
- .block{padding:8px 12px;border-bottom:1px solid #1c1f25}
- .block>b{display:block;color:#8b949e;font-weight:500;margin-bottom:4px;text-transform:lowercase;letter-spacing:.04em}
- .stages{display:flex;flex-wrap:wrap;gap:4px}
+ .stagepane{padding:6px 12px;display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid #1c1f25}
  .chip{border:1px solid #2b2f36;border-radius:10px;padding:1px 8px;font-size:11px;color:#9aa4b1}
  .chip.running{border-color:#d29922;color:#e3b341}
  .chip.done{border-color:#238636;color:#56d364}
  .chip.reused{border-color:#30363d;color:#6e7681}
- .chip.fail{border-color:#da3633;color:#f85149}
+ .chip.skipped{border-color:#6e7681;color:#6e7681;text-decoration:line-through}
+ .view{position:relative;background:#fff;height:52vh;min-height:320px;overflow:hidden;cursor:grab}
+ .view.dragging{cursor:grabbing}
+ .view canvas{position:absolute;top:0;left:0;transform-origin:0 0}
+ .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8b949e;background:#12151a}
+ .tools{display:flex;flex-wrap:wrap;gap:10px;padding:5px 12px;border-bottom:1px solid #1c1f25;font-size:11px;color:#9aa4b1;align-items:center}
+ .tools label{display:flex;gap:4px;align-items:center;cursor:pointer}
+ .tools input{padding:0;accent-color:#1f6feb}
+ .swatch{width:9px;height:9px;border-radius:50%;display:inline-block}
+ .hover{padding:4px 12px;font-size:11px;color:#adbac7;border-bottom:1px solid #1c1f25;min-height:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ details{border-bottom:1px solid #1c1f25}
+ summary{padding:6px 12px;color:#8b949e;cursor:pointer;list-style:none;font-size:12px}
+ summary::-webkit-details-marker{display:none}
+ summary:before{content:'▸ ';color:#6e7681}
+ details[open]>summary:before{content:'▾ '}
+ .body{padding:0 12px 8px}
  .glyphs{display:flex;gap:10px;flex-wrap:wrap}
  .glyph{text-align:center;font-size:10px;color:#9aa4b1}
  .glyph img{display:block;background:#fff;border:1px solid #2b2f36;image-rendering:pixelated;max-width:72px;max-height:72px}
@@ -39,7 +52,6 @@
  .elapsed{padding:3px 12px;font-size:11px;color:#8b949e;display:flex;justify-content:space-between}
  .say{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #1c1f25}
  .say input{flex:1;min-width:0}
- .say select{background:#171a1f;color:#dfe3e8;border:1px solid #2b2f36;border-radius:4px;font:inherit}
  .notes{padding:0 12px 8px;font-size:11px;color:#9aa4b1}
  pre{margin:0;white-space:pre-wrap;color:#adbac7;font-size:11px}
  .verdict{font-weight:600}
@@ -49,36 +61,197 @@
 <header>
  <h1>chart harness</h1>
  <input type="file" id="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.webp,.bmp">
- <input id="query" size="52">
+ <input id="query" size="46">
  <input id="page" type="number" placeholder="pdf page" style="width:92px">
  <button id="go">read it</button>
- <span class="status" id="banner"></span>
+ <span class="status" id="banner">pick a figure — it appears in both panes before either reader is called</span>
 </header>
 <div id="sides"></div>
 <footer><section id="adjudication" hidden><h2>adjudication <span class="status" id="agree"></span></h2></section></footer>
 <script>
 const $ = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x !== undefined) e.textContent = x; return e; };
-let runId = null;
+let runId = null, uploaded = null, sideNames = [];
 const panels = new Map();
+const COLOUR = { observed: '#13a34a', reject: '#e63563', unresolved: '#e3a413',
+                 candidate: '#1f6feb', mark: '#8957e5', crowded: '#e3a413' };
 
-fetch('/config').then(r => r.json()).then(c => { query.value = c.query; });
+fetch('/config').then(r => r.json()).then(c => { query.value = c.query; sideNames = c.sides; });
+
+/* The figure itself is the interface: everything a reader claims is drawn on the
+   pixels it claimed it about, in that image's own coordinates. */
+function viewer(host) {
+  const canvas = document.createElement('canvas');
+  host.append(canvas);
+  const empty = $('div', 'empty', 'waiting for the figure');
+  host.append(empty);
+  const context = canvas.getContext('2d');
+  const v = {
+    image: null, scale: 1, x: 0, y: 0, fitted: false,
+    layers: { marks: true, candidates: true, reading: true, axes: true, ids: true },
+    marks: [], plot: null, ticks: null, candidates: [], screen: new Map(), rows: [],
+    onhover: () => {}
+  };
+  v.load = src => {
+    const image = new Image();
+    image.onload = () => { v.image = image; empty.remove(); v.fit(); v.draw(); };
+    image.src = src;
+  };
+  v.fit = () => {
+    if (!v.image) return;
+    v.scale = Math.min(host.clientWidth / v.image.width, host.clientHeight / v.image.height);
+    v.x = (host.clientWidth - v.image.width * v.scale) / 2;
+    v.y = (host.clientHeight - v.image.height * v.scale) / 2;
+    v.place();
+  };
+  v.place = () => { canvas.style.transform = `translate(${v.x}px,${v.y}px) scale(${v.scale})`; };
+  v.draw = () => {
+    if (!v.image) return;
+    canvas.width = v.image.width; canvas.height = v.image.height;
+    context.drawImage(v.image, 0, 0);
+    const line = Math.max(1, Math.round(v.image.width / 900));
+    const font = Math.max(10, Math.round(v.image.width / 90));
+    context.lineWidth = line * 2;
+    context.font = font + 'px ui-monospace, monospace';
+    if (v.layers.axes && v.plot) {
+      context.strokeStyle = 'rgba(31,111,235,.75)';
+      context.strokeRect(v.plot[0], v.plot[1], v.plot[2] - v.plot[0], v.plot[3] - v.plot[1]);
+      if (v.ticks) {
+        context.strokeStyle = 'rgba(31,111,235,.55)';
+        for (const x of v.ticks.x || []) segment(x, v.plot[3], x, v.plot[3] - font);
+        for (const y of v.ticks.y || []) segment(v.plot[0], y, v.plot[0] + font, y);
+      }
+    }
+    if (v.layers.marks) {
+      context.strokeStyle = COLOUR.mark;
+      for (const m of v.marks) {
+        context.strokeStyle = m.crowded ? COLOUR.crowded : COLOUR.mark;
+        context.strokeRect(m.bbox[0], m.bbox[1], m.bbox[2] - m.bbox[0], m.bbox[3] - m.bbox[1]);
+      }
+    }
+    for (const point of v.points()) {
+      context.strokeStyle = point.colour;
+      context.beginPath();
+      context.arc(point.x, point.y, font * .7, 0, 2 * Math.PI);
+      context.stroke();
+      if (v.layers.ids) {
+        context.fillStyle = point.colour;
+        context.fillText(point.text, point.x + font, point.y - font * .3);
+      }
+    }
+    function segment(x1, y1, x2, y2) {
+      context.beginPath(); context.moveTo(x1, y1); context.lineTo(x2, y2); context.stroke();
+    }
+  };
+  /* Proposals are what a reader claims; the reading is what survived the pixels.
+     Both are kept so the viewer can see what was thrown away and why. */
+  v.points = () => {
+    const read = new Map(v.rows.map(r => [r.candidate_id, r]));
+    const out = [];
+    for (const c of v.candidates) {
+      const row = read.get(c.candidate_id);
+      if (row && !v.layers.reading) continue;
+      if (!row && !v.layers.candidates) continue;
+      const screened = v.screen.get(c.candidate_id);
+      const status = row ? row.status : (screened && !screened.passed ? 'reject' : null);
+      out.push({
+        x: (row && row.pixel_x != null ? row.pixel_x : c.pixel_x),
+        y: (row && row.pixel_y != null ? row.pixel_y : c.pixel_y),
+        colour: status ? (COLOUR[status] || COLOUR.reject) : COLOUR.candidate,
+        text: label(c, row), id: c.candidate_id,
+        detail: detail(c, row, screened)
+      });
+    }
+    return out.filter(p => p.x != null && p.y != null);
+  };
+  v.at = (px, py) => {
+    let best = null, distance = Infinity;
+    for (const point of v.points()) {
+      const d = Math.hypot(point.x - px, point.y - py);
+      if (d < distance) { distance = d; best = point; }
+    }
+    return distance < 24 ? best : null;
+  };
+  host.addEventListener('wheel', event => {
+    if (!v.image) return;
+    event.preventDefault();
+    const rect = host.getBoundingClientRect();
+    const ox = event.clientX - rect.left, oy = event.clientY - rect.top;
+    const factor = Math.exp(-event.deltaY / 400);
+    const next = Math.min(20, Math.max(.05, v.scale * factor));
+    v.x = ox - (ox - v.x) * (next / v.scale);
+    v.y = oy - (oy - v.y) * (next / v.scale);
+    v.scale = next; v.place();
+  }, { passive: false });
+  let dragging = null;
+  host.addEventListener('mousedown', e => { dragging = { x: e.clientX - v.x, y: e.clientY - v.y }; host.classList.add('dragging'); });
+  addEventListener('mouseup', () => { dragging = null; host.classList.remove('dragging'); });
+  host.addEventListener('mousemove', event => {
+    if (dragging) { v.x = event.clientX - dragging.x; v.y = event.clientY - dragging.y; v.place(); return; }
+    if (!v.image) return;
+    const rect = host.getBoundingClientRect();
+    const point = v.at((event.clientX - rect.left - v.x) / v.scale, (event.clientY - rect.top - v.y) / v.scale);
+    v.onhover(point ? point.detail : '');
+  });
+  return v;
+}
+
+function label(candidate, row) {
+  const group = (row && row.series_label) || candidate.series_label
+    || (candidate.possible_groups || []).join('/') || '';
+  const value = row && row.x != null ? `${figure(row.x)},${figure(row.y)}` : '';
+  return [candidate.candidate_id, group, value].filter(Boolean).join(' ');
+}
+
+function detail(candidate, row, screened) {
+  const unitx = unit(candidate.x_unit), unity = unit(candidate.y_unit);
+  const parts = [candidate.candidate_id];
+  parts.push('group ' + ((row && row.series_label) || candidate.series_label
+    || (candidate.possible_groups || []).join(' or ') || 'unattributed'));
+  const source = row && row.x != null ? row : candidate;
+  parts.push(`x ${figure(source.x)}${unitx} · y ${figure(source.y)}${unity}`);
+  parts.push(`pixel ${Math.round(source.pixel_x)},${Math.round(source.pixel_y)}`);
+  if (screened) parts.push(screened.passed ? 'pixels match the marker'
+    : 'pixel screen failed: ' + (screened.reason || ''));
+  if (row) parts.push(row.status + (row.reason ? ' — ' + row.reason : ''));
+  return parts.join('  ·  ');
+}
 
 function panel(side) {
   if (panels.has(side)) return panels.get(side);
   const root = $('section');
   const head = $('h2'); head.append($('span', null, side));
-  const status = $('span', 'status', 'starting');
+  const status = $('span', 'status', 'waiting');
   head.append(status); root.append(head);
   const bar = $('div', 'bar'); bar.append($('i')); root.append(bar);
+  const view = $('div', 'view'); root.append(view);
+  const v = viewer(view);
+  const tools = $('div', 'tools');
+  for (const [key, text, colour] of [['marks', 'marks python measured', COLOUR.mark],
+      ['candidates', 'proposed', COLOUR.candidate], ['reading', 'reading (kept/rejected)', COLOUR.observed],
+      ['axes', 'plot box & ticks', '#1f6feb'], ['ids', 'labels', '#8b949e']]) {
+    const box = document.createElement('input'); box.type = 'checkbox'; box.checked = true;
+    box.onchange = () => { v.layers[key] = box.checked; v.draw(); };
+    const l = document.createElement('label');
+    const dot = $('span', 'swatch'); dot.style.background = colour;
+    l.append(box, dot, document.createTextNode(text)); tools.append(l);
+  }
+  const fit = $('button', null, 'fit'); fit.onclick = () => { v.fit(); }; tools.append(fit);
+  root.append(tools);
+  const hover = $('div', 'hover', 'hover a point to see what it was read as');
+  v.onhover = text => { hover.textContent = text || 'hover a point to see what it was read as'; };
+  root.append(hover);
+  const stagepane = $('div', 'stagepane'); root.append(stagepane);
   const elapsed = $('div', 'elapsed'); const clock = $('span', null, '0s');
   const calls = $('span', null, ''); elapsed.append(clock, calls); root.append(elapsed);
   const blocks = {};
-  for (const [key, title] of [['stages', 'stages'], ['legend', 'legend'], ['glyphs', 'legend glyphs (templates python searches for)'],
+  for (const [key, title] of [['legend', 'legend'], ['glyphs', 'legend glyphs (templates python searches for)'],
        ['marks', 'marks measured out of the plot (no legend)'],
        ['candidates', 'candidates proposed'], ['screen', 'pixel screen'], ['judgment', 'judged by the other reader'],
        ['iteration', 'second pass'], ['overlay', 'annotated versions (newest first)'], ['result', 'result']]) {
-    const b = $('div', 'block'); b.hidden = true; b.append($('b', null, title));
-    const body = $('div'); b.append(body); blocks[key] = body; blocks[key].box = b; root.append(b);
+    const d = document.createElement('details'); d.hidden = true;
+    const s = document.createElement('summary'); s.textContent = title; d.append(s);
+    const body = $('div', 'body'); d.append(body);
+    blocks[key] = body; blocks[key].box = d; root.append(d);
   }
   const say = $('div', 'say');
   const target = document.createElement('select');
@@ -101,10 +274,11 @@ function panel(side) {
 
   sides.append(root);
   const started = Date.now();
-  const p = { root, status, blocks, chips: new Map(), bar, notes, stages: 0 };
+  const p = { root, status, blocks, chips: new Map(), bar, notes, stages: 0, view: v, stagepane };
   p.tick = setInterval(() => { clock.textContent = Math.round((Date.now() - started) / 1000) + 's'; }, 1000);
   p.finish = state => { clearInterval(p.tick); bar.className = 'bar ' + state; };
   p.counted = () => { calls.textContent = p.stages + ' stages'; };
+  if (uploaded) v.load(uploaded);
   panels.set(side, p);
   return p;
 }
@@ -117,7 +291,7 @@ function version(p, title, path, summary) {
   const key = title + '|' + path + '|' + summary;
   if (seen.has(key)) return;
   seen.add(key);
-  const entry = $('div', 'block');
+  const entry = $('div');
   entry.append($('b', null, `v${seen.size} · ${title} · ${new Date().toLocaleTimeString()}`));
   entry.append($('div', null, summary));
   const image = document.createElement('img'); image.className = 'shot'; image.src = url(path);
@@ -125,7 +299,7 @@ function version(p, title, path, summary) {
   entry.append(link);
   b.prepend(entry);
 }
-function unit(name) { return name ? ' (' + name + ')' : ''; }
+function unit(name) { return name ? ' ' + name : ''; }
 
 function figure(value) {
   if (value == null || !isFinite(value)) return 'uncalibrated';
@@ -137,17 +311,26 @@ function url(path) { return '/file?run=' + encodeURIComponent(runId) + '&path=' 
 
 const render = {
   stage(p, e) {
-    const box = p.blocks.stages; box.box.hidden = false;
     let chip = p.chips.get(e.stage);
-    if (!chip) { chip = $('span', 'chip'); p.chips.set(e.stage, chip); box.append(chip); }
-    chip.className = 'chip ' + ({ started: 'running', finished: 'done', reused: 'reused' }[e.state] || '');
+    if (!chip) { chip = $('span', 'chip'); p.chips.set(e.stage, chip); p.stagepane.append(chip); }
+    chip.className = 'chip ' + ({ started: 'running', finished: 'done', reused: 'reused', skipped: 'skipped' }[e.state] || '');
     chip.textContent = e.stage + (e.seconds ? ' ' + e.seconds + 's' : '');
+    chip.title = e.reason || '';
     p.stages = p.chips.size; p.counted();
     p.status.textContent = e.state === 'started' ? e.stage + '…' : p.status.textContent;
   },
   panel(p, e) { p.status.textContent = 'panel ' + e.label + ' ' + e.state + (e.status ? ' — ' + e.status : ''); },
   reorient(p, e) { p.status.textContent = 'sheet printed sideways — rotating ' + e.clockwise + '°'; },
+  image(p, e) { p.view.load(url(e.path)); },
+  axes(p, e) {
+    p.view.plot = e.plot_bbox;
+    p.view.ticks = { x: e.x_ticks || [], y: e.y_ticks || [] };
+    p.view.draw();
+    p.status.textContent = e.inconclusive ? 'ticks not measurable'
+      : (e.agrees ? 'axes agree with the printed ticks' : 'axes disagree with the printed ticks');
+  },
   legend(p, e) {
+    if (e.plot_bbox) { p.view.plot = e.plot_bbox; p.view.draw(); }
     const t = $('table');
     t.append(row('th', ['series', 'marker', 'described as']));
     for (const s of e.series) t.append(row('td', [s.label || s.id, s.marker || '', s.marker_description || s.colour || '']));
@@ -157,16 +340,20 @@ const render = {
     const wrap = $('div', 'glyphs');
     if (!e.glyphs.length) wrap.append($('span', null, e.reason || 'none extracted'));
     for (const g of e.glyphs) {
-      const d = $('div', 'glyph'); const i = document.createElement('img');
-      i.src = url(g.template_path); d.append(i, $('div', null, g.label));
+      const d = $('div', 'glyph');
+      if (g.template_path) { const i = document.createElement('img'); i.src = url(g.template_path); d.append(i); }
+      d.append($('div', null, g.label));
       d.append($('div', null, g.width + '×' + g.height + 'px'));
       wrap.append(d);
     }
     show(p, 'glyphs', wrap);
   },
   detected_marks(p, e) {
-    // With no legend, Python locates the marks by ink thickness; a crowded body is
-    // several marks printed on top of one another and stays flagged as such.
+    // No legend: python locates the marks by ink thickness, and a crowded body is
+    // several marks printed over one another rather than one reading.
+    p.view.marks = e.marks || [];
+    if (e.plot_bbox) p.view.plot = e.plot_bbox;
+    p.view.draw();
     const wrap = $('div');
     wrap.append($('div', null, e.count
       ? `${e.count} ink bodies · about ${e.marks_suggested} marks · ${e.crowded} crowded`
@@ -175,6 +362,8 @@ const render = {
     show(p, 'marks', wrap);
   },
   candidates(p, e) {
+    p.view.candidates = e.candidates || [];
+    p.view.draw();
     const t = $('table');
     const first = e.candidates[0] || {};
     // Read in the figure's own units; the pixels stay only as provenance.
@@ -191,6 +380,8 @@ const render = {
     if (e.overlay) version(p, 'proposed points', e.overlay, e.count + ' candidates proposed');
   },
   screen(p, e) {
+    for (const r of e.results) p.view.screen.set(r.candidate_id, r);
+    p.view.draw();
     const t = $('table');
     t.append(row('th', ['', 'id', 'series', 'why', 'correction']));
     for (const r of e.results) {
@@ -221,6 +412,8 @@ const render = {
     show(p, 'iteration', wrap);
   },
   result(p, e) {
+    p.view.rows = e.rows || [];
+    p.view.draw();
     const wrap = $('div');
     const counts = Object.entries(e.counts || {}).map(([k, v]) => k + ' ' + v).join(' · ');
     wrap.append($('div', null, e.status + (counts ? ' — ' + counts : '')));
@@ -265,10 +458,23 @@ function handle(e) {
   if (render[e.kind]) render[e.kind](p, e);
 }
 
+// The figure is on screen in both panes the moment it is chosen, before any
+// reader has been called; the panes then swap to the page the readers are given.
+file.onchange = () => {
+  const f = file.files[0];
+  if (!f) return;
+  if (uploaded) URL.revokeObjectURL(uploaded);
+  uploaded = /\.pdf$/i.test(f.name) ? null : URL.createObjectURL(f);
+  sides.replaceChildren(); panels.clear();
+  for (const side of sideNames) panel(side);
+  banner.textContent = uploaded ? f.name + ' — press read it' : f.name + ' — pdf page renders once the run starts';
+};
+
 go.onclick = async () => {
   const f = file.files[0];
   if (!f) { banner.textContent = 'choose a file first'; return; }
-  go.disabled = true; sides.replaceChildren(); panels.clear(); adjudication.hidden = true;
+  go.disabled = true; adjudication.hidden = true;
+  if (!panels.size) for (const side of sideNames) panel(side);
   const q = new URLSearchParams({ filename: f.name, query: query.value });
   if (page.value) q.set('page', page.value);
   const started = await fetch('/runs?' + q, { method: 'POST', body: f });
@@ -279,4 +485,5 @@ go.onclick = async () => {
   stream.onmessage = m => { const e = JSON.parse(m.data); handle(e); if (e.kind === 'run_finished') { stream.close(); go.disabled = false; } };
   stream.onerror = () => { go.disabled = false; };
 };
+addEventListener('resize', () => { for (const p of panels.values()) p.view.fit(); });
 </script>

@@ -26,6 +26,7 @@ import mimetypes
 import os
 from pathlib import Path
 import re
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -280,6 +281,9 @@ class _Journal:
         self.usage_path = self.artifact_dir / "usage.jsonl"
         self.run_id = uuid.uuid4().hex
         self.provider_mode = mode
+        # Independent calls are issued concurrently, and the journal is the record
+        # the request limits are counted from, so it is written under a lock.
+        self.write_lock = threading.Lock()
         self.records: list[dict[str, Any]] = []
         if self.usage_path.exists():
             # Fail closed on a damaged journal rather than forgetting reservations.
@@ -287,11 +291,12 @@ class _Journal:
 
     def _record(self, record: dict[str, Any]) -> None:
         record = {"timestamp": _now(), "run_id": self.run_id, "provider_mode": self.provider_mode, **record}
-        with self.usage_path.open("a", encoding="utf-8") as handle:
-            handle.write(_json(record) + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        self.records.append(record)
+        with self.write_lock:
+            with self.usage_path.open("a", encoding="utf-8") as handle:
+                handle.write(_json(record) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            self.records.append(record)
 
     def summary(self) -> dict[str, Any]:
         finished = [r for r in self.records if r["event"] == "attempt_finished"]
@@ -367,16 +372,19 @@ class Provider(_Journal):
         if self.config.pricing is not None:
             inp = math.ceil(len(prompt.encode("utf-8")) / 3) + 64 + 4096 * image_count
             estimate = (inp * max(self.config.pricing["input"], self.config.pricing.get("cached", 0)) + output * self.config.pricing["output"]) / 1_000_000
-        if self.max_calls is not None and self.live_attempts >= self.max_calls:
-            raise BudgetExceeded("Maximum live HTTP attempts reached")
-        if self.max_reserved_output_tokens is not None and self.reserved_output_tokens + output > self.max_reserved_output_tokens:
-            raise BudgetExceeded("Output-token reservation budget would be exceeded")
-        if self.max_estimated_cost_usd is not None and self.estimated_reserved_cost_usd + estimate > self.max_estimated_cost_usd:
-            raise BudgetExceeded("Estimated-cost reservation budget would be exceeded")
-        self.live_attempts += 1
-        self.reserved_output_tokens += output
-        if estimate is not None:
-            self.estimated_reserved_cost_usd += estimate
+        # Reserving and counting is one step: concurrent calls must not both pass a
+        # limit that only one of them fits under.
+        with self.write_lock:
+            if self.max_calls is not None and self.live_attempts >= self.max_calls:
+                raise BudgetExceeded("Maximum live HTTP attempts reached")
+            if self.max_reserved_output_tokens is not None and self.reserved_output_tokens + output > self.max_reserved_output_tokens:
+                raise BudgetExceeded("Output-token reservation budget would be exceeded")
+            if self.max_estimated_cost_usd is not None and self.estimated_reserved_cost_usd + estimate > self.max_estimated_cost_usd:
+                raise BudgetExceeded("Estimated-cost reservation budget would be exceeded")
+            self.live_attempts += 1
+            self.reserved_output_tokens += output
+            if estimate is not None:
+                self.estimated_reserved_cost_usd += estimate
         return estimate
 
     def complete(self, stage: str, prompt: str, images: Sequence[Path] = (), schema: dict[str, Any] | None = None) -> dict[str, Any]:
