@@ -551,6 +551,15 @@ def analyze(image_path, interpretation: dict, outdir) -> dict:
     return proposals
 
 
+def redraw(image_path, proposals, label=None):
+    """Draw the numbered overlay again after the candidate list changed."""
+    _, image, _ = _load_image(image_path)
+    _overlay(image, proposals["candidates"], proposals["overlay_path"], label=label,
+             stage="proposals")
+    _write_json(proposals["proposals_path"], proposals)
+    return proposals["overlay_path"]
+
+
 def _axis_agreement(axis, independent, pixels, fraction):
     if independent.scale != axis.scale or _canonical_unit(independent.unit) != _canonical_unit(axis.unit):
         return {"accepted": False, "reason": "axis_scale_or_unit_mismatch", "primary_scale": axis.scale,

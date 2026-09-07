@@ -27,9 +27,10 @@ from . import doc_context
 from . import gaps
 from . import duel
 from . import frame_fit
-from . import panel_fit
 from . import reading_fit
 from . import unsteered
+from . import coverage
+from . import box_check
 from .consensus import compare
 from .coordinate_grid import coordinate_grid
 from .visual_check import VisualCheckProvider
@@ -348,12 +349,21 @@ def run(args):
    # Something python measured is on the canvas seconds after the upload, so the
    # wait for the first reader is a wait with the page's own geometry on screen.
    early=axis_detect.detect_ticks(out/'working.png')
-   progress.emit('axes',plot_bbox=axis_detect.plot_bbox_from_ticks(early),
+   early_box=axis_detect.plot_bbox_from_ticks(early)
+   # The box is drawn from the printed rules and ticks, so it can be judged the
+   # same way: the ink either continues past its edges or it does not. The
+   # verdict travels with the box rather than the watcher having to eyeball it.
+   held=box_check.score(out/'working.png',early_box) if early_box else None
+   progress.emit('axes',plot_bbox=early_box,
      x_ticks=early.get('x_tick_pixels',[]),y_ticks=early.get('y_tick_pixels',[]),
-     measured_only=True)
+     measured_only=True,box=held)
    progress.say('measured the printed ticks off the page first: {x} across, {y} up. '
      'Asking the reader what they mean.'.format(x=len(early.get('x_tick_pixels',[])),
                                                 y=len(early.get('y_tick_pixels',[]))))
+   if held and not held['holds']:
+    progress.say('the measured plot box has printed ink running across its {s} side(s), '
+      'so whatever falls outside it is not being read'.format(
+        s='/'.join(held['edges_cutting_ink'])))
   # The finders need no reader: they measure ink. Running them while the first
   # interpret call is still open puts real marks on the canvas within seconds of
   # the upload instead of after the slowest model call of the run, and the work
@@ -631,6 +641,32 @@ def run(args):
       'landed on {b}'.format(n=frame['landed_on_marks'],b=frame['landed_before']))
     progress.emit('reading_frame',**frame)
   proposals=stage('proposals',lambda:geometry.analyze(out/'working.png',interpretation,out/'geometry'))
+  # A candidate is only searched for beside a seed the reader gave, so a reading
+  # that lists the first few sampling columns and stops leaves the rest of the
+  # plot unexamined however well its own points sit on their marks. Python has
+  # already measured mark-shaped bodies right across the box, and one standing in
+  # a column no candidate occupies is a place nobody looked: that one is carried
+  # in with its group left open, and faces the same pixel screen as the rest. A
+  # body inside a column the reading did read is left alone, because the finders
+  # also catch error-bar caps and crossing ink and filling in from those would
+  # trade a short reading for an inflated one.
+  if config.get('cover_measured_marks',True) and proposals.get('candidates') is not None:
+   box=proposals.get('plot_bbox')
+   # Marks and candidates have to have been measured on the same plot box, or the
+   # comparison is between two different frames.
+   same=bank if bank is not None else (early_bank.get('bank')
+     if box and early_bank.get('plot_bbox')==[float(v) for v in box] else None)
+   measured=[m for m in (same or {}).get('pooled') or [] if coverage.inside(m,box)]
+   near=coverage.reach(measured,interpretation.get('series'))
+   spanned=coverage.span(measured,proposals['candidates'],box)
+   added=coverage.add(proposals,measured,near,
+     [s['id'] for s in interpretation.get('series',[])]) if measured else []
+   if added:
+    geometry.redraw(out/'working.png',proposals,provider_label(config))
+   if measured:
+    progress.say(coverage.sentence(added,spanned))
+    progress.emit('coverage',added=len(added),measured_marks=len(measured),
+      within_px=near,**(spanned or {}))
   # A proposal is only meaningful as a reading of the figure, so it is reported in
   # the figure's own units and against the group it was attributed to; the pixels
   # stay alongside because they are what the screen re-measures.
@@ -1023,12 +1059,20 @@ Return an empty panels list if the requested figure is absent. Source evidence:
    if not isinstance(pid,str) or not pid.replace('_','').replace('-','').isalnum() or pid in used:raise ValueError('unsafe or duplicate panel ID')
    used.add(pid)
    # A box marked on a downscaled view lands a few pixels inside the drawing and
-   # clips the rule or the last column; where it cuts ink it is moved off it.
-   panel_box,widened=panel_fit.widen(out/'oriented_page.png',native_box(panel['crop_bbox']))
-   if widened:
-    progress.say('the panel box cut through the figure; moved its edges out to blank paper by {m}px'.format(
-      m=','.join(str(v) for v in widened['moved'])),source=provider_label(config))
-    progress.emit('panel_box_widened',panel=pid,**widened)
+   # clips the rule or the last column. Moving one edge off the ink can expose
+   # another - freeing the bottom of a curve reveals that its right end was cut
+   # too - so the box is scored and moved again until nothing crosses it, rather
+   # than once and hoped over.
+   panel_box,attempts=box_check.settle(out/'oriented_page.png',native_box(panel['crop_bbox']))
+   write_json(out/'panels'/pid/'panel_box.json',{'asked_for':native_box(panel['crop_bbox']),
+     'settled_on':panel_box,'attempts':attempts})
+   progress.say('panel {p}: {s}'.format(p=pid,s=box_check.sentence(attempts)),
+     source=provider_label(config))
+   if len(attempts)>1:
+    progress.emit('panel_box_widened',panel=pid,code='panel_box_grown_off_the_ink',
+      **{'from':attempts[0]['box'],'to':panel_box,'rounds':len(attempts)-1,
+         'moved':[attempts[0]['box'][0]-panel_box[0],attempts[0]['box'][1]-panel_box[1],
+                  panel_box[2]-attempts[0]['box'][2],panel_box[3]-attempts[0]['box'][3]]})
    sub=argparse.Namespace(source=str(out/'oriented_page.png'),config=args.config,out=str(out/'panels'/pid),
       query=args.query+'; panel: '+str(panel.get('label',pid)),page=None,rotate=0,
       crop=[int(v) for v in panel_box],context_file=args.context_file,reference_image=None,

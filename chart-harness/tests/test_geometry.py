@@ -1,13 +1,15 @@
 """Small synthetic checks of calibration, abstention, and visible-mark support."""
 import copy
 import csv
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from chart_harness.geometry import Axis, _axis_agreement, _overlay, _reading, analyze, finalize
+from chart_harness.geometry import (Axis, _axis_agreement, _overlay, _reading, analyze,
+                                    finalize, redraw)
 
 
 class GeometryTests(unittest.TestCase):
@@ -347,6 +349,17 @@ class GeometryTests(unittest.TestCase):
             self.assertNotEqual(blank.crop((0, 0, 200, 30)).tobytes(), b.crop((0, 0, 200, 30)).tobytes())
         self.assertEqual("9,31.6", _reading(rows[0]))
         self.assertIsNone(_reading({"candidate_id": "c1", "x": None, "y": 3.}))
+
+    def test_the_overlay_is_drawn_again_once_more_candidates_are_carried_in(self):
+        p = analyze(self.image, self.interpretation, self.root / "proposal")
+        before = Path(p["overlay_path"]).read_bytes()
+        p["candidates"].append({"candidate_id": "m0002", "pixel": {"x": 160., "y": 60.},
+                                "possible_series": ["drug"], "marker": "blob",
+                                "support": "unrefined", "diagnostics": {}})
+        redraw(self.image, p, label="grok")
+        self.assertNotEqual(Path(p["overlay_path"]).read_bytes(), before)
+        kept = json.loads(Path(p["proposals_path"]).read_text())
+        self.assertIn("m0002", [c["candidate_id"] for c in kept["candidates"]])
 
     def test_image_identity_is_enforced(self):
         p = analyze(self.image, self.interpretation, self.root / "proposal")

@@ -457,6 +457,11 @@ const render = {
     p.view.draw();
     p.status.textContent = e.inconclusive ? 'ticks not measurable'
       : (e.agrees ? 'axes agree with the printed ticks' : 'axes disagree with the printed ticks');
+    // The blue box is measured, so it is judged too: an edge with ink running
+    // across it has cut the drawing, and that is said rather than left to the eye.
+    if (e.box) p.say(e.box.holds
+      ? 'the measured plot box stands in blank paper on all four sides'
+      : `the measured plot box has printed ink running across its ${e.box.edges_cutting_ink.join('/')} side(s)`);
   },
   legend(p, e) {
     if (e.plot_bbox) { p.view.plot = e.plot_bbox; p.view.draw(); }
@@ -496,6 +501,16 @@ const render = {
       : 'none'));
     wrap.append($('div', null, e.reason || ''));
     show(p, 'marks', wrap);
+  },
+  coverage(p, e) {
+    // How much of the plot the reading itself reached, so a reading that stops a
+    // third of the way across shows as short rather than as finished.
+    const share = e.share_of_the_ink_covered;
+    p.say((share == null ? '' : `the reading's own points cover ${(share * 100).toFixed(0)}% `
+        + 'of the width the ink occupies; ')
+      + (e.added
+        ? `${e.added} measured mark(s) in columns it never reached were added as candidates`
+        : 'it proposed something in every column ink was measured in'));
   },
   candidates(p, e) {
     p.view.candidates = e.candidates || [];
