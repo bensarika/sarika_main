@@ -12,15 +12,22 @@ ramps from 10% up to 75% the longer a run lasts, which is the difficulty curve.
 
 The SARIKA LEADERBOARD panel (beside the canvas, below it on narrow screens) is company-wide and
 lives in S3. Browsers can't write to S3 safely, so `leaderboard/lambda_function.py` runs behind a
-public Lambda Function URL and owns the object: `GET` returns the top scores, `POST {name, score}`
-merges one in under an ETag-conditional write. Names are sanitized and capped at 16 characters,
-scores are bounded, and the list is trimmed to 20 entries. Submissions are unauthenticated, so
-scores are trust-based.
+public Lambda Function URL and owns the object: `GET` returns the top 10, `POST {score}` with an
+`Authorization: Bearer <Google ID token>` header merges one in under an ETag-conditional write.
 
-Run locally:
+Players sign in with Google (Identity Services, client ID in `index.html`) and must use a
+`@sarika.com` account; the page gates play behind that, and the Lambda re-verifies the token
+(audience, `hd`, verified email) via Google's tokeninfo endpoint, so the leaderboard name always
+comes from the Google account, never the browser. One row per person (best score kept), 10 rows
+max. The Lambda reads `LEADERBOARD_BUCKET`, `GOOGLE_CLIENT_ID` and optional `ALLOWED_DOMAIN`.
+
+Game instructions show in a popup the first time a browser signs in (`localStorage` flag
+`sarikaPongHowto`).
+
+Run locally (the OAuth client must list the origin, e.g. `http://localhost:8123`):
 
 ```bash
-python3 -m http.server 8000 --directory games/spark-dodge
+python3 -m http.server 8123 --directory games/spark-dodge
 ```
 
 ## Deployment
