@@ -1,0 +1,85 @@
+{
+  "record_version": "0.2.0",
+  "id": "temtokibart-lp0145-2240",
+  "indication": "atopic-dermatitis",
+  "title": "Temtokibart (LEO 138559) Phase 2b · LP0145-2240",
+  "intervention": "temtokibart",
+  "drug_class": "monoclonal antibody",
+  "mechanism": "anti-IL-22 receptor (IL-22RA1)",
+  "phase": "2b",
+  "sponsor": "LEO Pharma",
+  "registry_ids": ["NCT05923099"],
+  "protocol_identifier": "LP0145-2240",
+  "design": "Randomized, double-blind, placebo-controlled, 4 dose regimens vs placebo",
+  "population_summary": "Adults 18–75 with moderate-to-severe AD (Hanifin and Rajka), history of AD ≥1 year",
+  "treatment_weeks": 16,
+  "arms": [
+    {"id": "active", "label": "LEO 138559 (4 dose regimens)", "role": "investigational"},
+    {"id": "placebo", "label": "Placebo", "role": "placebo"}
+  ],
+  "endpoints": [
+    {
+      "id": "easi_pct_wk16",
+      "role": "primary",
+      "label": "Percent change in EASI score from baseline to Week 16",
+      "instrument": "EASI",
+      "transformation": "percent_change",
+      "timepoint_weeks": 16,
+      "provenance": {
+        "document": "Protocol Version 8.0 (28-Jun-2024)",
+        "source_id": "NCT05923099.Prot_SAP_000",
+        "page": 43,
+        "quote": "Primary endpoint: • Percent change in EASI score from baseline to Week 16.",
+        "status": "quoted",
+        "url": "https://cdn.clinicaltrials.gov/large-docs/99/NCT05923099/Prot_SAP_000.pdf"
+      }
+    }
+  ],
+  "criteria": [
+    {
+      "id": "inc_2_age",
+      "kind": "inclusion",
+      "category": "age",
+      "text": "18–75 years old (both included) at screening (Visit 1). For requirements specific for JP, see Section 12.5.4.",
+      "min_age": 18,
+      "max_age": 75,
+      "regional_exceptions": ["Japan: see Section 12.5.4", "EU countries (CZ, DE, ES, FR, HU, PL, RO): see Section 12.5.1.2"],
+      "provenance": {
+        "document": "Protocol Version 8.0 (28-Jun-2024)",
+        "source_id": "NCT05923099.Prot_SAP_000",
+        "page": 53,
+        "section": "Inclusion criteria · Criterion 2",
+        "quote": "Age 2. 18–75 years old (both included) at screening (Visit 1).",
+        "status": "quoted"
+      }
+    },
+    {
+      "id": "inc_4_diagnosis",
+      "kind": "inclusion",
+      "category": "diagnosis",
+      "text": "At screening, diagnosis of AD as defined by the Hanifin and Rajka (1980) criteria. History of AD for ≥1 year.",
+      "provenance": {
+        "document": "Protocol Version 8.0 (28-Jun-2024)",
+        "source_id": "NCT05923099.Prot_SAP_000",
+        "page": 53,
+        "section": "Inclusion criteria · Criterion 4",
+        "status": "quoted"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "source_id": "NCT05923099.Prot_SAP_000",
+      "kind": "protocol",
+      "title": "Protocol with SAP, Version 8.0 (document-system footer Version 5.0)",
+      "version_label": "8.0",
+      "date": "2024-06-28",
+      "url": "https://cdn.clinicaltrials.gov/large-docs/99/NCT05923099/Prot_SAP_000.pdf",
+      "sha256": "b7e58931f716336f05d3c36a3f712204234868190b283af70bb270e408268b56",
+      "bytes": 5662104,
+      "pages": 200,
+      "text_extractable": true
+    }
+  ],
+  "review_scope": "Primary endpoint (pages 18, 43) and first inclusion criteria (page 53) quoted from extracted PDF text. Some doses are redacted in the public document."
+}

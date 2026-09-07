@@ -1,0 +1,569 @@
+{
+  "inventory_version": "0.1.0",
+  "review_date": "2026-09-06",
+  "coverage_statement": "17 retrieved protocol packages: 11 selected-section detailed reviews and 6 structural checks. No claim of full-page or full-amendment review.",
+  "page_convention": "Physical PDF pages are one-based; printed page labels and document-system versions are separate facts.",
+  "retrieved_protocols": [
+    {
+      "source_id": "NCT03054428.Prot_000",
+      "study_id": "NCT03054428",
+      "intervention": "dupilumab",
+      "phase_scope": "phase 3 adolescent",
+      "protocol_identifier": "R668-AD-1526",
+      "registry_url": "https://clinicaltrials.gov/study/NCT03054428",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/28/NCT03054428/Prot_000.pdf",
+      "local_source_filename_at_review": "NCT03054428_Prot_000.pdf",
+      "sha256": "99bdca95f7bd6d9b64500d301b667a9d03be8737f0b2bf490e95f23aa4628799",
+      "bytes": 2111847,
+      "physical_pdf_pages": 100,
+      "date": {
+        "type": "approval",
+        "value": "2018-02-23"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "detailed_selected_sections",
+      "selected_sections_reviewed": [
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "structure_inspected": true,
+      "protocol_version_label": "amendment 3",
+      "limitations_or_identity_notes": "Distinct from the inaccessible adult SOLO studies."
+    },
+    {
+      "source_id": "NCT03443024.Prot_000",
+      "study_id": "NCT03443024",
+      "intervention": "lebrikizumab",
+      "phase_scope": "phase 2b",
+      "protocol_identifier": "DRM06-AD01 / J2T-DM-KGAF",
+      "registry_url": "https://clinicaltrials.gov/study/NCT03443024",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/24/NCT03443024/Prot_000.pdf",
+      "local_source_filename_at_review": "NCT03443024_Prot_000.pdf",
+      "sha256": "d75c66eb713eb4356fb2760d96999da3f163640895cb0249af3c7a1191122d67",
+      "bytes": 1294170,
+      "physical_pdf_pages": 65,
+      "date": {
+        "type": "protocol",
+        "value": "2018-03-07"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "detailed_selected_sections",
+      "selected_sections_reviewed": [
+        "2",
+        "3",
+        "4",
+        "5",
+        "6.10",
+        "7",
+        "8",
+        "9",
+        "11",
+        "appendix 1"
+      ],
+      "structure_inspected": true,
+      "protocol_version_label": "amendment 2",
+      "limitations_or_identity_notes": "Includes amendment corrections; not TREBLE."
+    },
+    {
+      "source_id": "NCT04146363.Prot_000",
+      "study_id": "NCT04146363",
+      "intervention": "lebrikizumab",
+      "phase_scope": "phase 3",
+      "protocol_identifier": "DRM06-AD04 / J2T-DM-KGAB",
+      "registry_url": "https://clinicaltrials.gov/study/NCT04146363",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/63/NCT04146363/Prot_000.pdf",
+      "local_source_filename_at_review": "NCT04146363_Prot_000.pdf",
+      "sha256": "5addd8fdbd27e61e227a980eba1c06bb990ba359c977d17bd6751124941b376d",
+      "bytes": 1201134,
+      "physical_pdf_pages": 84,
+      "date": {
+        "type": "protocol",
+        "value": "2020-05-20"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "detailed_selected_sections",
+      "selected_sections_reviewed": [
+        "2",
+        "3",
+        "4",
+        "5.3",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "structure_inspected": true,
+      "protocol_version_label": "amendment 2",
+      "limitations_or_identity_notes": "Potential response-direction inconsistency needs adjudication."
+    },
+    {
+      "source_id": "NCT04178967.Prot_000",
+      "study_id": "NCT04178967",
+      "intervention": "lebrikizumab",
+      "phase_scope": "phase 3",
+      "protocol_identifier": "DRM06-AD05 / J2T-DM-KGAC",
+      "registry_url": "https://clinicaltrials.gov/study/NCT04178967",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/67/NCT04178967/Prot_000.pdf",
+      "local_source_filename_at_review": "NCT04178967_Prot_000.pdf",
+      "sha256": "ba5e499aed5b7d5a71c1387d935bf6d0b8ee107a3417363d334c6907a0bdb2aa",
+      "bytes": 1579701,
+      "physical_pdf_pages": 84,
+      "date": {
+        "type": "protocol",
+        "value": "2020-05-20"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "structure_checked",
+      "selected_sections_reviewed": [],
+      "structure_inspected": true,
+      "protocol_version_label": "amendment 2",
+      "limitations_or_identity_notes": "Cover also labels Clinical Study Protocol Version 3."
+    },
+    {
+      "source_id": "NCT03131648.Prot_000",
+      "study_id": "NCT03131648",
+      "intervention": "tralokinumab",
+      "phase_scope": "phase 3",
+      "protocol_identifier": "LP0162-1325",
+      "registry_url": "https://clinicaltrials.gov/study/NCT03131648",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/48/NCT03131648/Prot_000.pdf",
+      "local_source_filename_at_review": "NCT03131648_Prot_000.pdf",
+      "sha256": "c1d59696ff5366f88eb69e9b128e7d8e5e7c49de4c4ada3b6e9ab5ab769d59c5",
+      "bytes": 3496215,
+      "physical_pdf_pages": 171,
+      "date": {
+        "type": "protocol",
+        "value": "2018-08-14"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "detailed_selected_sections",
+      "selected_sections_reviewed": [
+        "4",
+        "6",
+        "7",
+        "8",
+        "9.7",
+        "10",
+        "11",
+        "12.3.5",
+        "appendix 4"
+      ],
+      "structure_inspected": true,
+      "protocol_version_label": "4",
+      "limitations_or_identity_notes": "Cover contains LP0160-1325; operative internal identifier is LP0162-1325."
+    },
+    {
+      "source_id": "NCT03160885.Prot_001",
+      "study_id": "NCT03160885",
+      "intervention": "tralokinumab",
+      "phase_scope": "phase 3",
+      "protocol_identifier": "LP0162-1326",
+      "registry_url": "https://clinicaltrials.gov/study/NCT03160885",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/85/NCT03160885/Prot_001.pdf",
+      "local_source_filename_at_review": "NCT03160885_Prot_001.pdf",
+      "sha256": "b994e438ee130e1683158604138b899cfca44fcb7640df79a11106d57b6d02bc",
+      "bytes": 1963911,
+      "physical_pdf_pages": 158,
+      "date": {
+        "type": "protocol",
+        "value": "2018-08-14"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "structure_checked",
+      "selected_sections_reviewed": [],
+      "structure_inspected": true,
+      "protocol_version_label": "4"
+    },
+    {
+      "source_id": "NCT03363854.Prot_000",
+      "study_id": "NCT03363854",
+      "intervention": "tralokinumab",
+      "phase_scope": "phase 3",
+      "protocol_identifier": "LP0162-1339",
+      "registry_url": "https://clinicaltrials.gov/study/NCT03363854",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/54/NCT03363854/Prot_000.pdf",
+      "local_source_filename_at_review": "NCT03363854_Prot_000.pdf",
+      "sha256": "c45218205be0923ab51a05d094e13e3639b96c92f1c0ba734425523c4abeedc4",
+      "bytes": 2541431,
+      "physical_pdf_pages": 131,
+      "date": {
+        "type": "registry_document",
+        "value": "2018-08-29"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "structure_checked",
+      "selected_sections_reviewed": [],
+      "structure_inspected": true
+    },
+    {
+      "source_id": "NCT03985943.Prot_000",
+      "study_id": "NCT03985943",
+      "intervention": "nemolizumab",
+      "phase_scope": "phase 3",
+      "protocol_identifier": "RD.06.SPR.118161",
+      "registry_url": "https://clinicaltrials.gov/study/NCT03985943",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/43/NCT03985943/Prot_000.pdf",
+      "local_source_filename_at_review": "NCT03985943_Prot_000.pdf",
+      "sha256": "36829742c538785cb71b5cdd7a5039e0d302c839a51b537acfcaa5f6778bbcd1",
+      "bytes": 6961392,
+      "physical_pdf_pages": 218,
+      "date": {
+        "type": "protocol",
+        "value": "2021-11-04"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "detailed_selected_sections",
+      "selected_sections_reviewed": [
+        "7",
+        "8.1",
+        "8.3",
+        "8.4.9",
+        "9",
+        "10"
+      ],
+      "structure_inspected": true,
+      "protocol_version_label": "8",
+      "limitations_or_identity_notes": "Some pages are image-only; some content is visibly redacted. Approval 2021-11-17."
+    },
+    {
+      "source_id": "NCT03989349.Prot_000",
+      "study_id": "NCT03989349",
+      "intervention": "nemolizumab",
+      "phase_scope": "phase 3",
+      "protocol_identifier": "RD.06.SPR.118169",
+      "registry_url": "https://clinicaltrials.gov/study/NCT03989349",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/49/NCT03989349/Prot_000.pdf",
+      "local_source_filename_at_review": "NCT03989349_Prot_000.pdf",
+      "sha256": "fbfaa328edddfcd024a69f84f52a2a1794c799b29394e7f842a3dab519eba4a4",
+      "bytes": 3318929,
+      "physical_pdf_pages": 186,
+      "date": {
+        "type": "protocol",
+        "value": "2021-11-04"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "structure_checked",
+      "selected_sections_reviewed": [],
+      "structure_inspected": true,
+      "protocol_version_label": "8",
+      "limitations_or_identity_notes": "Approval 2021-11-17."
+    },
+    {
+      "source_id": "NCT03706040.Prot_000",
+      "study_id": "NCT03706040",
+      "intervention": "risankizumab",
+      "phase_scope": "phase 2",
+      "protocol_identifier": "M16-813",
+      "registry_url": "https://clinicaltrials.gov/study/NCT03706040",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/40/NCT03706040/Prot_000.pdf",
+      "local_source_filename_at_review": "NCT03706040_Prot_000.pdf",
+      "sha256": "3efebeead391ffb5ae75bb6a3bb292b31157914c28a061548f858007b0ebeac7",
+      "bytes": 13128247,
+      "physical_pdf_pages": 114,
+      "date": {
+        "type": "registry_document",
+        "value": "2020-10-13"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "detailed_selected_sections",
+      "selected_sections_reviewed": [
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "appendix D",
+        "appendix F"
+      ],
+      "structure_inspected": true,
+      "protocol_version_label": "5",
+      "limitations_or_identity_notes": "Includes operations manual; physical and printed pagination differ."
+    },
+    {
+      "source_id": "NCT03569293.Prot_002",
+      "study_id": "NCT03569293",
+      "intervention": "upadacitinib",
+      "phase_scope": "phase 3",
+      "protocol_identifier": "M16-045",
+      "registry_url": "https://clinicaltrials.gov/study/NCT03569293",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/93/NCT03569293/Prot_002.pdf",
+      "local_source_filename_at_review": "NCT03569293_Prot_002.pdf",
+      "sha256": "5050eec5ed5781421990678d7372ce0377e5c474396d8b4917ca521a8b469ac7",
+      "bytes": 3217572,
+      "physical_pdf_pages": 104,
+      "date": {
+        "type": "registry_document",
+        "value": "2022-12-13"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "detailed_selected_sections",
+      "selected_sections_reviewed": [
+        "3",
+        "4",
+        "5",
+        "6.2",
+        "7"
+      ],
+      "structure_inspected": true,
+      "protocol_version_label": "7",
+      "limitations_or_identity_notes": "104 physical pages; internal footer refers to 166 pages. Referenced material is incomplete in posted package."
+    },
+    {
+      "source_id": "NCT03607422.Prot_002",
+      "study_id": "NCT03607422",
+      "intervention": "upadacitinib",
+      "phase_scope": "phase 3",
+      "protocol_identifier": "M18-891",
+      "registry_url": "https://clinicaltrials.gov/study/NCT03607422",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/22/NCT03607422/Prot_002.pdf",
+      "local_source_filename_at_review": "NCT03607422_Prot_002.pdf",
+      "sha256": "ee32aa64877daffeec2d7c8ac42953c53b1f380ea2c14004d22c80eba69dcd95",
+      "bytes": 7423631,
+      "physical_pdf_pages": 145,
+      "date": {
+        "type": "registry_document",
+        "value": "2022-12-13"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "structure_checked",
+      "selected_sections_reviewed": [],
+      "structure_inspected": true,
+      "limitations_or_identity_notes": "Some bookmark destinations are invalid; do not use them as verified page references."
+    },
+    {
+      "source_id": "NCT03568318.Prot_000",
+      "study_id": "NCT03568318",
+      "intervention": "upadacitinib",
+      "phase_scope": "phase 3",
+      "protocol_identifier": "M16-047",
+      "registry_url": "https://clinicaltrials.gov/study/NCT03568318",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/18/NCT03568318/Prot_000.pdf",
+      "local_source_filename_at_review": "NCT03568318_Prot_000.pdf",
+      "sha256": "c65e30b2757db97ee6ae052bec05152b9081bb84755414226b1058d2a68b9866",
+      "bytes": 15563436,
+      "physical_pdf_pages": 137,
+      "date": {
+        "type": "registry_document",
+        "value": "2020-04-29"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "structure_checked",
+      "selected_sections_reviewed": [],
+      "structure_inspected": true,
+      "limitations_or_identity_notes": "Includes operations-manual material."
+    },
+    {
+      "source_id": "NCT04975438.Prot_000",
+      "study_id": "NCT04975438",
+      "intervention": "GSK1070806",
+      "phase_scope": "phase 1b",
+      "protocol_identifier": "215253",
+      "registry_url": "https://clinicaltrials.gov/study/NCT04975438",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/38/NCT04975438/Prot_000.pdf",
+      "local_source_filename_at_review": "NCT04975438_Prot_000.pdf",
+      "sha256": "977d1f2b2f6745fd004c9ea64ffcd5c1f36e927c410c01e18d5c175c530b6024",
+      "bytes": 3125308,
+      "physical_pdf_pages": 96,
+      "date": {
+        "type": "protocol",
+        "value": "2022-06-06"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "detailed_selected_sections",
+      "selected_sections_reviewed": [
+        "1.3",
+        "3",
+        "4",
+        "5",
+        "6",
+        "8",
+        "9"
+      ],
+      "structure_inspected": true,
+      "limitations_or_identity_notes": "Single IV dose study; phase 1b, not phase 2."
+    },
+    {
+      "source_id": "NCT05999799.Prot_002",
+      "study_id": "NCT05999799",
+      "intervention": "GSK1070806",
+      "phase_scope": "phase 2b",
+      "protocol_identifier": "219538",
+      "registry_url": "https://clinicaltrials.gov/study/NCT05999799",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/99/NCT05999799/Prot_002.pdf",
+      "local_source_filename_at_review": "NCT05999799_Prot_002.pdf",
+      "sha256": "547b8c0b23d5c8161887a62ff3ea7962dad3978389beabc98e27b096d838ef34",
+      "bytes": 1060527,
+      "physical_pdf_pages": 141,
+      "date": {
+        "type": "protocol",
+        "value": "2024-06-07"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "detailed_selected_sections",
+      "selected_sections_reviewed": [
+        "1.3",
+        "3.2",
+        "4",
+        "6.9.3",
+        "8",
+        "9.1",
+        "9.3.2"
+      ],
+      "structure_inspected": true,
+      "protocol_version_label": "amendment 1",
+      "limitations_or_identity_notes": "Dose and some model details are redacted; prior details refer to SAP."
+    },
+    {
+      "source_id": "NCT04922021.Prot_SAP_000",
+      "study_id": "NCT04922021",
+      "intervention": "temtokibart",
+      "phase_scope": "phase 2a",
+      "protocol_identifier": "LP0145-1376",
+      "registry_url": "https://clinicaltrials.gov/study/NCT04922021",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/21/NCT04922021/Prot_SAP_000.pdf",
+      "local_source_filename_at_review": "NCT04922021_Prot_SAP_000.pdf",
+      "sha256": "9d820942f073d36d34c2c00315399b00fadaf4393c2545bc294db034e0a2b2bc",
+      "bytes": 1294264,
+      "physical_pdf_pages": 152,
+      "date": {
+        "type": "protocol",
+        "value": "2022-01-31"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "detailed_selected_sections",
+      "selected_sections_reviewed": [
+        "4",
+        "6",
+        "7",
+        "8",
+        "9.5",
+        "10",
+        "11",
+        "13",
+        "14.3.8",
+        "appendix 3"
+      ],
+      "structure_inspected": true,
+      "protocol_version_label": "4"
+    },
+    {
+      "source_id": "NCT05923099.Prot_SAP_000",
+      "study_id": "NCT05923099",
+      "intervention": "temtokibart",
+      "phase_scope": "phase 2b",
+      "protocol_identifier": "LP0145-2240",
+      "registry_url": "https://clinicaltrials.gov/study/NCT05923099",
+      "document_url": "https://cdn.clinicaltrials.gov/large-docs/99/NCT05923099/Prot_SAP_000.pdf",
+      "local_source_filename_at_review": "NCT05923099_Prot_SAP_000.pdf",
+      "sha256": "b7e58931f716336f05d3c36a3f712204234868190b283af70bb270e408268b56",
+      "bytes": 5662104,
+      "physical_pdf_pages": 200,
+      "date": {
+        "type": "protocol",
+        "value": "2024-06-28"
+      },
+      "retrieval_status": "retrieved",
+      "review_scope": "detailed_selected_sections",
+      "selected_sections_reviewed": [
+        "1.3",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "10",
+        "11.3.6",
+        "12"
+      ],
+      "structure_inspected": true,
+      "protocol_version_label": "8",
+      "limitations_or_identity_notes": "Document-system footer says Version 5.0, distinct from protocol v8. Some doses and instrument content are redacted."
+    }
+  ],
+  "registry_only_or_unretrieved_protocols": [
+    {
+      "study_id": "NCT01859988",
+      "protocol_identifier": "R668-AD-1021",
+      "scope": "adult dupilumab phase 2b",
+      "status": "registry_only",
+      "reason": "No protocol attachment exposed on checked registry record; original protocol not retrieved.",
+      "registry_url": "https://clinicaltrials.gov/study/NCT01859988",
+      "eu_registry_results_url": "https://www.clinicaltrialsregister.eu/ctr-search/trial/2012-003651-11/results",
+      "eu_registry_review_scope": "Identity and attachment availability checked; phase 2b and SOLO 1 amendment summaries reviewed. Registry results and summaries are not the full original protocol."
+    },
+    {
+      "study_id": "NCT01548404",
+      "protocol_identifier": "R668-AD-1117",
+      "scope": "early dupilumab phase 2",
+      "status": "registry_only",
+      "reason": "Identified NEJM protocol supplement inaccessible; HTTP 403 and human-verification challenge.",
+      "protocol_url": "https://www.nejm.org/doi/suppl/10.1056/NEJMoa1314768/suppl_file/nejmoa1314768_protocol.pdf",
+      "registry_url": "https://clinicaltrials.gov/study/NCT01548404"
+    },
+    {
+      "study_id": "NCT02277743",
+      "protocol_identifier": "R668-AD-1334",
+      "scope": "adult dupilumab SOLO 1",
+      "status": "registry_only",
+      "reason": "No registry protocol attachment; identified NEJM supplement inaccessible.",
+      "protocol_url": "https://www.nejm.org/doi/suppl/10.1056/NEJMoa1610020/suppl_file/nejmoa1610020_protocol.pdf",
+      "registry_url": "https://clinicaltrials.gov/study/NCT02277743",
+      "eu_registry_results_url": "https://www.clinicaltrialsregister.eu/ctr-search/trial/2014-001198-15/results",
+      "eu_registry_review_scope": "Identity and attachment availability checked; phase 2b and SOLO 1 amendment summaries reviewed. Registry results and summaries are not the full original protocol."
+    },
+    {
+      "study_id": "NCT02277769",
+      "protocol_identifier": "R668-AD-1416",
+      "scope": "adult dupilumab SOLO 2",
+      "status": "registry_only",
+      "reason": "No registry protocol attachment; shared NEJM supplement inaccessible.",
+      "protocol_url": "https://www.nejm.org/doi/suppl/10.1056/NEJMoa1610020/suppl_file/nejmoa1610020_protocol.pdf",
+      "registry_url": "https://clinicaltrials.gov/study/NCT02277769",
+      "eu_registry_results_url": "https://www.clinicaltrialsregister.eu/ctr-search/trial/2014-002619-40/results",
+      "eu_registry_review_scope": "Identity and attachment availability checked; phase 2b and SOLO 1 amendment summaries reviewed. Registry results and summaries are not the full original protocol."
+    },
+    {
+      "study_id": "NCT02260986",
+      "scope": "dupilumab CHRONOS",
+      "status": "registry_checked_no_protocol_retrieved",
+      "reason": "No protocol attachment exposed on checked registry record; publication supplement inaccessible.",
+      "registry_url": "https://clinicaltrials.gov/study/NCT02260986"
+    },
+    {
+      "study_id": "NCT02340234",
+      "protocol_identifier": "GS29250",
+      "scope": "lebrikizumab TREBLE phase 2",
+      "status": "registry_checked_no_protocol_retrieved",
+      "reason": "No protocol attachment exposed on checked registry record. Phase 2b NCT03443024 supplies the reviewed lebrikizumab phase 2 structure.",
+      "registry_url": "https://clinicaltrials.gov/study/NCT02340234"
+    }
+  ],
+  "standards": [
+    {
+      "id": "ICH.M11.template.2025",
+      "name": "ICH M11 final template",
+      "adopted": "2025-11-19",
+      "url": "https://database.ich.org/sites/default/files/ICH_Step4_M11_Final_Template_2025_1119.pdf",
+      "role": "External document-structure mapping target; this scaffold is not a conformant implementation."
+    },
+    {
+      "id": "CDISC.USDM",
+      "name": "CDISC DDF / USDM",
+      "url": "https://www.cdisc.org/ddf",
+      "role": "Interoperability reference; select and map to a specified release during implementation."
+    },
+    {
+      "id": "ICH.E9R1",
+      "name": "ICH E9(R1)",
+      "url": "https://www.ema.europa.eu/en/documents/scientific-guideline/ich-e9-r1-addendum-estimands-and-sensitivity-analysis-clinical-trials-guideline-statistical-principles-clinical-trials-step-5_en.pdf",
+      "role": "Estimand and sensitivity-analysis semantics."
+    }
+  ]
+}

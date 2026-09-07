@@ -1,0 +1,83 @@
+{
+  "record_version": "0.2.0",
+  "id": "gsk1070806-219538",
+  "indication": "atopic-dermatitis",
+  "title": "GSK1070806 Phase 2b · 219538",
+  "intervention": "GSK1070806",
+  "drug_class": "monoclonal antibody",
+  "mechanism": "anti-IL-18",
+  "phase": "2b",
+  "sponsor": "GSK",
+  "registry_ids": ["NCT05999799"],
+  "protocol_identifier": "219538",
+  "design": "Randomized, placebo-controlled, dose-ranging; biologic-naive and biologic-experienced groups; 2:1:1:1:2 randomization",
+  "population_summary": "Adults (≥18 years) with moderate-to-severe AtD for at least 1 year, EASI ≥16, IGA ≥3, BSA ≥10%",
+  "treatment_weeks": 16,
+  "arms": [
+    {"id": "active", "label": "GSK1070806 (dose range)", "role": "investigational"},
+    {"id": "placebo", "label": "Placebo SC", "role": "placebo", "planned_n": 50}
+  ],
+  "endpoints": [
+    {
+      "id": "easi_pct_wk16",
+      "role": "primary",
+      "label": "Percent change from baseline (PCFB) in the EASI to Week 16",
+      "instrument": "EASI",
+      "transformation": "percent_change",
+      "timepoint_weeks": 16,
+      "provenance": {
+        "document": "Protocol Amendment 1 Final (07 Jun 2024)",
+        "source_id": "NCT05999799.Prot_002",
+        "page": 24,
+        "section": "Objectives, Endpoints, and Estimands",
+        "quote": "Primary: To evaluate the efficacy of GSK1070806 versus placebo in adults with moderate to severe AtD. PCFB in the EASI to Week 16.",
+        "status": "quoted",
+        "url": "https://cdn.clinicaltrials.gov/large-docs/99/NCT05999799/Prot_002.pdf"
+      }
+    },
+    {
+      "id": "easi_pct_each_timepoint",
+      "role": "secondary",
+      "label": "PCFB in the EASI at each time point (longitudinal dose-response)",
+      "instrument": "EASI",
+      "transformation": "percent_change",
+      "provenance": {
+        "document": "Protocol Amendment 1 Final (07 Jun 2024)",
+        "source_id": "NCT05999799.Prot_002",
+        "page": 24,
+        "status": "quoted"
+      }
+    }
+  ],
+  "criteria": [
+    {
+      "id": "synopsis_age",
+      "kind": "inclusion",
+      "category": "age",
+      "text": "Eligible adult participants (≥18 years of age) with moderate-to-severe AtD for at least 1 year, as defined by the AAD Consensus Criteria, with an EASI Score of ≥16, an IGA score of ≥3 and a BSA of ≥10%.",
+      "min_age": 18,
+      "provenance": {
+        "document": "Protocol Amendment 1 Final (07 Jun 2024)",
+        "source_id": "NCT05999799.Prot_002",
+        "page": 25,
+        "section": "Synopsis · Overall design (numbered criterion in §5.1 not yet parsed)",
+        "status": "quoted"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "source_id": "NCT05999799.Prot_002",
+      "kind": "protocol",
+      "title": "Protocol Amendment 1 Final",
+      "version_label": "Amendment 1",
+      "date": "2024-06-07",
+      "url": "https://cdn.clinicaltrials.gov/large-docs/99/NCT05999799/Prot_002.pdf",
+      "sha256": "547b8c0b23d5c8161887a62ff3ea7962dad3978389beabc98e27b096d838ef34",
+      "bytes": 1060527,
+      "pages": 141,
+      "text_extractable": true
+    }
+  ],
+  "review_scope": "Objectives/endpoints table (page 24) and synopsis population (page 25) quoted. The numbered eligibility list has not been parsed; the mock's 'Age 18–75, regional minimums' row for this study is NOT confirmed by the text and is omitted."
+}

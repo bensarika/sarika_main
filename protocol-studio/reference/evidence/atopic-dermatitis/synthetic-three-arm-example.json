@@ -1,0 +1,38 @@
+{
+  "record_version": "0.2.0",
+  "id": "synthetic-three-arm-example",
+  "indication": "atopic-dermatitis",
+  "title": "Illustrative three-arm study · Stable background therapy",
+  "intervention": "Antibody A / Antibody B",
+  "drug_class": "monoclonal antibody",
+  "phase": "2b",
+  "design": "Synthetic three-arm randomized comparison used as a planning fixture",
+  "background_therapy": "Stable low-to-medium potency TCS",
+  "rescue_policy": "Rescue counted as non-response (composite strategy)",
+  "population_summary": "Synthetic adult moderate-to-severe AD population",
+  "treatment_weeks": 16,
+  "synthetic": true,
+  "arms": [
+    {"id": "a", "label": "Antibody A", "role": "investigational"},
+    {"id": "b", "label": "Antibody B", "role": "investigational"},
+    {"id": "placebo", "label": "Placebo", "role": "placebo"}
+  ],
+  "endpoints": [
+    {"id": "easi75_wk16", "role": "primary", "label": "EASI-75 at Week 16", "instrument": "EASI", "transformation": "responder", "responder_threshold": "75%", "timepoint_weeks": 16, "provenance": {"status": "synthetic"}},
+    {"id": "easi90_wk16", "role": "secondary", "label": "EASI-90 at Week 16", "instrument": "EASI", "transformation": "responder", "responder_threshold": "90%", "timepoint_weeks": 16, "provenance": {"status": "synthetic"}},
+    {"id": "nrs4_wk16", "role": "secondary", "label": "Pruritus NRS ≥4-point improvement at Week 16", "instrument": "NRS", "transformation": "responder", "responder_threshold": "4 points", "timepoint_weeks": 16, "provenance": {"status": "synthetic"}}
+  ],
+  "results": [
+    {"endpoint_id": "easi75_wk16", "arm_id": "a", "timepoint_weeks": 16, "value": 0.60, "unit": "proportion", "provenance": {"status": "synthetic"}},
+    {"endpoint_id": "easi75_wk16", "arm_id": "b", "timepoint_weeks": 16, "value": 0.50, "unit": "proportion", "provenance": {"status": "synthetic"}},
+    {"endpoint_id": "easi75_wk16", "arm_id": "placebo", "timepoint_weeks": 16, "value": 0.30, "unit": "proportion", "provenance": {"status": "synthetic"}},
+    {"endpoint_id": "easi90_wk16", "arm_id": "a", "timepoint_weeks": 16, "value": 0.38, "unit": "proportion", "provenance": {"status": "synthetic"}},
+    {"endpoint_id": "easi90_wk16", "arm_id": "b", "timepoint_weeks": 16, "value": 0.30, "unit": "proportion", "provenance": {"status": "synthetic"}},
+    {"endpoint_id": "easi90_wk16", "arm_id": "placebo", "timepoint_weeks": 16, "value": 0.12, "unit": "proportion", "provenance": {"status": "synthetic"}},
+    {"endpoint_id": "nrs4_wk16", "arm_id": "a", "timepoint_weeks": 16, "value": 0.48, "unit": "proportion", "provenance": {"status": "synthetic"}},
+    {"endpoint_id": "nrs4_wk16", "arm_id": "b", "timepoint_weeks": 16, "value": 0.42, "unit": "proportion", "provenance": {"status": "synthetic"}},
+    {"endpoint_id": "nrs4_wk16", "arm_id": "placebo", "timepoint_weeks": 16, "value": 0.20, "unit": "proportion", "provenance": {"status": "synthetic"}}
+  ],
+  "review_scope": "Synthetic planning fixture. No real trial result is represented.",
+  "notes": "Numbers chosen to match the Trial Lab default scenario (60% vs 30%). Not evidence."
+}

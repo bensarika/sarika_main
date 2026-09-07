@@ -1,0 +1,576 @@
+{
+  "version": "0.1.0",
+  "purpose": "Application-oriented synthesis; map to the pinned official M11 structure before a conformant renderer is claimed.",
+  "sections": [
+    {
+      "id": "section.0",
+      "number": 0,
+      "title": "Identity and document control",
+      "subsections": [
+        {
+          "id": "section.0.1",
+          "title": "Title and identifiers"
+        },
+        {
+          "id": "section.0.2",
+          "title": "sponsor and responsible roles"
+        },
+        {
+          "id": "section.0.3",
+          "title": "phase"
+        },
+        {
+          "id": "section.0.4",
+          "title": "protocol/approval dates"
+        },
+        {
+          "id": "section.0.5",
+          "title": "version and amendments"
+        },
+        {
+          "id": "section.0.6",
+          "title": "signatures"
+        },
+        {
+          "id": "section.0.7",
+          "title": "applicable regions"
+        },
+        {
+          "id": "section.0.8",
+          "title": "linked documents"
+        }
+      ],
+      "object_summary": "Protocol version, role, amendment, source, dependency",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.1",
+      "number": 1,
+      "title": "Study summary",
+      "subsections": [
+        {
+          "id": "section.1.1",
+          "title": "Synopsis"
+        },
+        {
+          "id": "section.1.2",
+          "title": "treatment-path diagram"
+        },
+        {
+          "id": "section.1.3",
+          "title": "schedule of activities"
+        }
+      ],
+      "object_summary": "Generated views of the same trial model",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": true
+    },
+    {
+      "id": "section.2",
+      "number": 2,
+      "title": "Scientific justification",
+      "subsections": [
+        {
+          "id": "section.2.1",
+          "title": "Disease and unmet need"
+        },
+        {
+          "id": "section.2.2",
+          "title": "mechanism"
+        },
+        {
+          "id": "section.2.3",
+          "title": "nonclinical/clinical evidence"
+        },
+        {
+          "id": "section.2.4",
+          "title": "trial purpose"
+        },
+        {
+          "id": "section.2.5",
+          "title": "benefits"
+        },
+        {
+          "id": "section.2.6",
+          "title": "risks and mitigation"
+        },
+        {
+          "id": "section.2.7",
+          "title": "overall justification"
+        }
+      ],
+      "object_summary": "Evidence dossier, objective, risk, rationale",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.3",
+      "number": 3,
+      "title": "Questions and outcomes",
+      "subsections": [
+        {
+          "id": "section.3.1",
+          "title": "Repeated primary/secondary/exploratory objectives"
+        },
+        {
+          "id": "section.3.2",
+          "title": "corresponding endpoint definitions and estimands"
+        },
+        {
+          "id": "section.3.3",
+          "title": "region-specific priorities"
+        }
+      ],
+      "object_summary": "Objective, endpoint, estimand, scope",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.4",
+      "number": 4,
+      "title": "Design and participant paths",
+      "subsections": [
+        {
+          "id": "section.4.1",
+          "title": "Trial type and control"
+        },
+        {
+          "id": "section.4.2",
+          "title": "cohorts"
+        },
+        {
+          "id": "section.4.3",
+          "title": "periods"
+        },
+        {
+          "id": "section.4.4",
+          "title": "allocation and rerandomization"
+        },
+        {
+          "id": "section.4.5",
+          "title": "entry/exit transitions"
+        },
+        {
+          "id": "section.4.6",
+          "title": "duration"
+        },
+        {
+          "id": "section.4.7",
+          "title": "design justification"
+        },
+        {
+          "id": "section.4.8",
+          "title": "interim decisions"
+        },
+        {
+          "id": "section.4.9",
+          "title": "whole-trial stopping"
+        },
+        {
+          "id": "section.4.10",
+          "title": "end-of-trial and subsequent access"
+        }
+      ],
+      "object_summary": "Period, path, allocation, transition, decision",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.5",
+      "number": 5,
+      "title": "Participant selection",
+      "subsections": [
+        {
+          "id": "section.5.1",
+          "title": "Population rationale"
+        },
+        {
+          "id": "section.5.2",
+          "title": "inclusion/exclusion"
+        },
+        {
+          "id": "section.5.3",
+          "title": "prior-treatment definitions"
+        },
+        {
+          "id": "section.5.4",
+          "title": "washout"
+        },
+        {
+          "id": "section.5.5",
+          "title": "reproductive requirements"
+        },
+        {
+          "id": "section.5.6",
+          "title": "lifestyle rules"
+        },
+        {
+          "id": "section.5.7",
+          "title": "screen failures and rescreening"
+        }
+      ],
+      "object_summary": "Population, eligibility expression, policy",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.6",
+      "number": 6,
+      "title": "Treatments and concomitant care",
+      "subsections": [
+        {
+          "id": "section.6.1",
+          "title": "Products and formulations"
+        },
+        {
+          "id": "section.6.2",
+          "title": "dose rationale"
+        },
+        {
+          "id": "section.6.3",
+          "title": "loading/maintenance"
+        },
+        {
+          "id": "section.6.4",
+          "title": "administration"
+        },
+        {
+          "id": "section.6.5",
+          "title": "masking"
+        },
+        {
+          "id": "section.6.6",
+          "title": "preparation/storage/accountability"
+        },
+        {
+          "id": "section.6.7",
+          "title": "adherence"
+        },
+        {
+          "id": "section.6.8",
+          "title": "dose changes"
+        },
+        {
+          "id": "section.6.9",
+          "title": "overdose"
+        },
+        {
+          "id": "section.6.10",
+          "title": "background/rescue/permitted/prohibited therapies"
+        }
+      ],
+      "object_summary": "Product, regimen, administration, treatment policy",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.7",
+      "number": 7,
+      "title": "Discontinuation and continued observation",
+      "subsections": [
+        {
+          "id": "section.7.1",
+          "title": "Temporary interruption"
+        },
+        {
+          "id": "section.7.2",
+          "title": "permanent drug stop"
+        },
+        {
+          "id": "section.7.3",
+          "title": "restart/rechallenge"
+        },
+        {
+          "id": "section.7.4",
+          "title": "stopping one component of combination therapy"
+        },
+        {
+          "id": "section.7.5",
+          "title": "withdrawal from some/all procedures"
+        },
+        {
+          "id": "section.7.6",
+          "title": "consent withdrawal"
+        },
+        {
+          "id": "section.7.7",
+          "title": "lost contact"
+        },
+        {
+          "id": "section.7.8",
+          "title": "follow-up"
+        }
+      ],
+      "object_summary": "State transition, rule, consent scope, event-triggered activity",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.8",
+      "number": 8,
+      "title": "Assessments and procedures",
+      "subsections": [
+        {
+          "id": "section.8.1",
+          "title": "Screening/baseline"
+        },
+        {
+          "id": "section.8.2",
+          "title": "efficacy"
+        },
+        {
+          "id": "section.8.3",
+          "title": "patient reports"
+        },
+        {
+          "id": "section.8.4",
+          "title": "clinical safety measurements"
+        },
+        {
+          "id": "section.8.5",
+          "title": "PK"
+        },
+        {
+          "id": "section.8.6",
+          "title": "PD/biomarkers"
+        },
+        {
+          "id": "section.8.7",
+          "title": "immunogenicity"
+        },
+        {
+          "id": "section.8.8",
+          "title": "specimens"
+        },
+        {
+          "id": "section.8.9",
+          "title": "optional studies"
+        },
+        {
+          "id": "section.8.10",
+          "title": "visit windows"
+        },
+        {
+          "id": "section.8.11",
+          "title": "sequence within visits"
+        }
+      ],
+      "object_summary": "Assessment definition, encounter, scheduled activity, sample",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.9",
+      "number": 9,
+      "title": "Safety events and reporting",
+      "subsections": [
+        {
+          "id": "section.9.1",
+          "title": "AE/SAE/AESI definitions"
+        },
+        {
+          "id": "section.9.2",
+          "title": "disease-event exceptions"
+        },
+        {
+          "id": "section.9.3",
+          "title": "collection windows"
+        },
+        {
+          "id": "section.9.4",
+          "title": "grading/causality"
+        },
+        {
+          "id": "section.9.5",
+          "title": "reporting clocks and recipients"
+        },
+        {
+          "id": "section.9.6",
+          "title": "pregnancy"
+        },
+        {
+          "id": "section.9.7",
+          "title": "product complaints"
+        },
+        {
+          "id": "section.9.8",
+          "title": "special situations"
+        },
+        {
+          "id": "section.9.9",
+          "title": "outcome follow-up"
+        }
+      ],
+      "object_summary": "Event definition, reporting rule, risk, responsibility",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.10",
+      "number": 10,
+      "title": "Statistical specification",
+      "subsections": [
+        {
+          "id": "section.10.1",
+          "title": "Analysis sets"
+        },
+        {
+          "id": "section.10.2",
+          "title": "endpoint/estimand-specific estimators"
+        },
+        {
+          "id": "section.10.3",
+          "title": "covariates"
+        },
+        {
+          "id": "section.10.4",
+          "title": "post-event data use"
+        },
+        {
+          "id": "section.10.5",
+          "title": "missing-data assumptions"
+        },
+        {
+          "id": "section.10.6",
+          "title": "sensitivity/supplementary analyses"
+        },
+        {
+          "id": "section.10.7",
+          "title": "testing families"
+        },
+        {
+          "id": "section.10.8",
+          "title": "Bayesian priors/decisions if used"
+        },
+        {
+          "id": "section.10.9",
+          "title": "interim analyses"
+        },
+        {
+          "id": "section.10.10",
+          "title": "sample-size rationale"
+        }
+      ],
+      "object_summary": "Analysis, analysis set, testing family, sample-size design",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.11",
+      "number": 11,
+      "title": "Oversight and conduct",
+      "subsections": [
+        {
+          "id": "section.11.1",
+          "title": "Ethics and consent/assent"
+        },
+        {
+          "id": "section.11.2",
+          "title": "committees"
+        },
+        {
+          "id": "section.11.3",
+          "title": "monitoring"
+        },
+        {
+          "id": "section.11.4",
+          "title": "quality management"
+        },
+        {
+          "id": "section.11.5",
+          "title": "data governance"
+        },
+        {
+          "id": "section.11.6",
+          "title": "source records"
+        },
+        {
+          "id": "section.11.7",
+          "title": "privacy"
+        },
+        {
+          "id": "section.11.8",
+          "title": "deviations"
+        },
+        {
+          "id": "section.11.9",
+          "title": "site closure"
+        },
+        {
+          "id": "section.11.10",
+          "title": "insurance"
+        },
+        {
+          "id": "section.11.11",
+          "title": "publication and data sharing"
+        }
+      ],
+      "object_summary": "Governance policy, role, dependency",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.12",
+      "number": 12,
+      "title": "Supporting material",
+      "subsections": [
+        {
+          "id": "section.12.1",
+          "title": "Laboratory panels"
+        },
+        {
+          "id": "section.12.2",
+          "title": "regional addenda"
+        },
+        {
+          "id": "section.12.3",
+          "title": "prior amendments"
+        },
+        {
+          "id": "section.12.4",
+          "title": "instruments and scoring references"
+        },
+        {
+          "id": "section.12.5",
+          "title": "operational detail"
+        },
+        {
+          "id": "section.12.6",
+          "title": "contingency arrangements"
+        }
+      ],
+      "object_summary": "Appendix, overlay, referenced document",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.13",
+      "number": 13,
+      "title": "Terminology",
+      "subsections": [
+        {
+          "id": "section.13.1",
+          "title": "Defined terms and abbreviations"
+        }
+      ],
+      "object_summary": "Controlled vocabulary plus source-native terminology",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    },
+    {
+      "id": "section.14",
+      "number": 14,
+      "title": "References",
+      "subsections": [
+        {
+          "id": "section.14.1",
+          "title": "Bibliography and linked supporting evidence"
+        }
+      ],
+      "object_summary": "Evidence record",
+      "applicability": "Assess at subsection/module level; do not infer that every optional procedure is required.",
+      "generated_view": false
+    }
+  ]
+}

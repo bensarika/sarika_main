@@ -1,0 +1,61 @@
+# CI for protocol-studio/ (uv workspace + Vite client).
+# Runs on every push/PR that touches the product directory. Mirrors the
+# commands documented in protocol-studio/README.md → "Develop".
+name: protocol-studio
+
+on:
+  push:
+    branches: [main]
+    paths: ["protocol-studio/**", ".github/workflows/protocol-studio.yml"]
+  pull_request:
+    paths: ["protocol-studio/**", ".github/workflows/protocol-studio.yml"]
+
+defaults:
+  run:
+    working-directory: protocol-studio
+
+jobs:
+  python:
+    name: lint · types · tests (python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: protocol-studio/uv.lock
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Tectonic (PDF compile test)
+        run: |
+          curl -fsSL https://drop-sh.fullyjustified.net | sh
+          sudo mv tectonic /usr/local/bin/tectonic
+          tectonic --version
+      - name: Cache Tectonic bundle
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Tectonic
+          key: tectonic-${{ runner.os }}-${{ hashFiles('protocol-studio/packages/render/src/ps_render/latex.py') }}
+      - run: uv sync --all-packages --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run pytest
+
+  web:
+    name: typecheck · build (web)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: protocol-studio/apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: protocol-studio/apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build

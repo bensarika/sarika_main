@@ -1,0 +1,73 @@
+{
+  "record_version": "0.2.0",
+  "id": "lebrikizumab-drm06-ad01",
+  "indication": "atopic-dermatitis",
+  "title": "Lebrikizumab Phase 2b · DRM06-AD01",
+  "intervention": "lebrikizumab",
+  "drug_class": "monoclonal antibody",
+  "mechanism": "anti-IL-13",
+  "phase": "2b",
+  "sponsor": "Dermira",
+  "registry_ids": ["NCT03443024"],
+  "protocol_identifier": "DRM06-AD01 / J2T-DM-KGAF",
+  "design": "Randomized, double-blind, placebo-controlled, dose-ranging",
+  "treatment_weeks": 16,
+  "arms": [
+    {"id": "active", "label": "Lebrikizumab (dose-ranging)", "role": "investigational"},
+    {"id": "placebo", "label": "Placebo", "role": "placebo"}
+  ],
+  "endpoints": [
+    {
+      "id": "easi_pct_wk16",
+      "role": "primary",
+      "label": "Percent change in EASI from baseline to Week 16",
+      "instrument": "EASI",
+      "transformation": "percent_change",
+      "timepoint_weeks": 16,
+      "provenance": {
+        "document": "ClinicalTrials.gov primary outcome measure",
+        "source_id": "NCT03443024.Prot_000",
+        "status": "registry",
+        "url": "https://clinicaltrials.gov/study/NCT03443024"
+      }
+    }
+  ],
+  "criteria": [
+    {
+      "id": "registry_age",
+      "kind": "inclusion",
+      "category": "age",
+      "text": "18 years and older (registry eligibility field; protocol wording not yet confirmed).",
+      "min_age": 18,
+      "provenance": {
+        "document": "ClinicalTrials.gov eligibility",
+        "source_id": "NCT03443024.Prot_000",
+        "status": "registry",
+        "url": "https://clinicaltrials.gov/study/NCT03443024"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "source_id": "NCT03443024.Prot_000",
+      "kind": "protocol",
+      "title": "Protocol Amendment 2 (registry copy)",
+      "version_label": "Amendment 2",
+      "date": "2018-03-07",
+      "url": "https://cdn.clinicaltrials.gov/large-docs/24/NCT03443024/Prot_000.pdf",
+      "sha256": "d75c66eb713eb4356fb2760d96999da3f163640895cb0249af3c7a1191122d67",
+      "bytes": 1294170,
+      "pages": 65
+    },
+    {
+      "source_id": "upload:lebri_p2b_prot.pdf",
+      "kind": "protocol",
+      "title": "lebri_p2b_prot.pdf (uploaded copy)",
+      "sha256": "7fc4dc2065394ce6636b13a4e4fc8f3c8973fe357bf1aabaec9142bc8135989f",
+      "bytes": 2188175,
+      "pages": 65,
+      "text_extractable": false
+    }
+  ],
+  "review_scope": "The uploaded PDF has no machine-extractable text (compressed streams failed to decode); endpoint and age are taken from the registry and must be confirmed against the document before citation."
+}

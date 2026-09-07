@@ -1,0 +1,97 @@
+{
+  "record_version": "0.2.0",
+  "id": "temtokibart-lp0145-1376",
+  "indication": "atopic-dermatitis",
+  "title": "Temtokibart (LEO 138559) Phase 2a · LP0145-1376",
+  "intervention": "temtokibart",
+  "drug_class": "monoclonal antibody",
+  "mechanism": "anti-IL-22 receptor (IL-22RA1)",
+  "phase": "2a",
+  "sponsor": "LEO Pharma",
+  "registry_ids": ["NCT04922021"],
+  "protocol_identifier": "LP0145-1376",
+  "design": "Randomized, double-blind, placebo-controlled",
+  "population_summary": "Adults 18–64 with moderate to severe AD and inadequate response to topical treatment",
+  "treatment_weeks": 16,
+  "arms": [
+    {"id": "active", "label": "LEO 138559", "role": "investigational"},
+    {"id": "placebo", "label": "Placebo", "role": "placebo"}
+  ],
+  "endpoints": [
+    {
+      "id": "easi_abs_wk16",
+      "role": "primary",
+      "label": "Change in EASI score from baseline to Week 16",
+      "instrument": "EASI",
+      "transformation": "absolute_change",
+      "timepoint_weeks": 16,
+      "provenance": {
+        "document": "Protocol Version 4.0 (31-Jan-2022)",
+        "source_id": "NCT04922021.Prot_SAP_000",
+        "page": 38,
+        "quote": "Primary endpoint • Change in Eczema Area and Severity Index (EASI) score from baseline to Week 16.",
+        "status": "quoted",
+        "url": "https://cdn.clinicaltrials.gov/large-docs/21/NCT04922021/Prot_SAP_000.pdf"
+      }
+    }
+  ],
+  "criteria": [
+    {
+      "id": "inc_2_age",
+      "kind": "inclusion",
+      "category": "age",
+      "text": "18-64 years old (both included) at screening.",
+      "min_age": 18,
+      "max_age": 64,
+      "provenance": {
+        "document": "Protocol Version 4.0 (31-Jan-2022)",
+        "source_id": "NCT04922021.Prot_SAP_000",
+        "page": 43,
+        "section": "Inclusion criteria · Criterion 2",
+        "quote": "2. 18-64 years old (both included) at screening.",
+        "status": "quoted"
+      }
+    },
+    {
+      "id": "inc_3_diagnosis",
+      "kind": "inclusion",
+      "category": "diagnosis",
+      "text": "Diagnosis of AD [as defined by the AAD Consensus Criteria and Appendix 4] that has been present for ≥1 year prior to screening.",
+      "provenance": {
+        "document": "Protocol Version 4.0 (31-Jan-2022)",
+        "source_id": "NCT04922021.Prot_SAP_000",
+        "page": 43,
+        "section": "Inclusion criteria · Criterion 3",
+        "status": "quoted"
+      }
+    },
+    {
+      "id": "inc_4_prior_treatment",
+      "kind": "inclusion",
+      "category": "prior_treatment",
+      "text": "Recent history (within 6 months before screening) of inadequate response to treatment with topical medication, or for whom topical treatments are otherwise medically inadvisable.",
+      "provenance": {
+        "document": "Protocol Version 4.0 (31-Jan-2022)",
+        "source_id": "NCT04922021.Prot_SAP_000",
+        "page": 43,
+        "section": "Inclusion criteria · Criterion 4",
+        "status": "quoted"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "source_id": "NCT04922021.Prot_SAP_000",
+      "kind": "protocol",
+      "title": "Protocol with SAP, Version 4.0",
+      "version_label": "4.0",
+      "date": "2022-01-31",
+      "url": "https://cdn.clinicaltrials.gov/large-docs/21/NCT04922021/Prot_SAP_000.pdf",
+      "sha256": "9d820942f073d36d34c2c00315399b00fadaf4393c2545bc294db034e0a2b2bc",
+      "bytes": 1294264,
+      "pages": 152,
+      "text_extractable": true
+    }
+  ],
+  "review_scope": "Primary endpoint and first inclusion criteria quoted from extracted PDF text (pages 38, 43). Other sections not yet parsed."
+}

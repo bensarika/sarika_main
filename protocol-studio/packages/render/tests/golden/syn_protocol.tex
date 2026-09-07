@@ -1,0 +1,312 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=25mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{booktabs,longtable,array,xcolor,fancyhdr,enumitem,ragged2e}
+\usepackage[hidelinks]{hyperref}
+\setcounter{secnumdepth}{0}\setcounter{tocdepth}{1}
+\definecolor{psink}{HTML}{1F2937}
+\definecolor{psmuted}{HTML}{6B7280}
+\definecolor{pswarn}{HTML}{B45309}
+\definecolor{pserr}{HTML}{B91C1C}
+\newcommand{\psnote}[2]{\par\noindent\colorbox{#1!8}{\parbox{\dimexpr\linewidth-2\fboxsep}{\small\color{#1}#2}}\par}
+\newcommand{\psannot}[1]{\marginpar{\footnotesize\color{psmuted}#1}}
+\pagestyle{fancy}\fancyhf{}
+\renewcommand{\headrulewidth}{0.2pt}
+\fancyhead[L]{\small\color{psmuted}Synthetic AD endpoint and rescue linkage example}
+\fancyfoot[L]{\footnotesize\color{psmuted}v-test \textperiodcentered{} rendered 2026-01-01 \textperiodcentered{} ps-render 0.1.0}
+\fancyfoot[R]{\footnotesize\thepage}
+\setlength{\parskip}{6pt}\setlength{\parindent}{0pt}
+\begin{document}
+
+\begin{titlepage}\vspace*{30mm}
+{\color{psmuted}\large Clinical Trial Protocol}\par\vspace{6mm}
+{\Huge\bfseries\color{psink}\RaggedRight Synthetic AD endpoint and rescue linkage example}\par\vspace{14mm}
+\begin{tabular}{@{}>{\color{psmuted}}p{45mm}p{100mm}@{}}
+Protocol identifier & SYN.protocol.v1 \\
+Version & v-test \\
+Sponsor & --- \\
+Indication & atopic dermatitis \\
+Phase & --- \\
+\end{tabular}\vfill
+{\small\color{psmuted}v-test \textperiodcentered{} rendered 2026-01-01 \textperiodcentered{} ps-render 0.1.0}
+\end{titlepage}
+\tableofcontents\newpage
+\section{0\quad Identity and document control}\label{section.0}
+\subsection{0.1\quad Title and identifiers}\label{section.0.1}
+\psnote{pswarn}{Not yet written.}
+\subsection{0.2\quad Sponsor and responsible roles}\label{section.0.2}
+\psnote{pswarn}{Not yet written.}
+\subsection{0.3\quad Phase}\label{section.0.3}
+\psnote{pswarn}{Not yet written.}
+\subsection{0.4\quad Protocol/approval dates}\label{section.0.4}
+\psnote{pswarn}{Not yet written.}
+\subsection{0.5\quad Version and amendments}\label{section.0.5}
+\psnote{pswarn}{Not yet written.}
+\subsection{0.6\quad Signatures}\label{section.0.6}
+\psnote{pswarn}{Not yet written.}
+\subsection{0.7\quad Applicable regions}\label{section.0.7}
+\psnote{pswarn}{Not yet written.}
+\subsection{0.8\quad Linked documents}\label{section.0.8}
+\psnote{pswarn}{Not yet written.}
+\section{1\quad Study summary}\label{section.1}
+\subsection{1.1\quad Synopsis}\label{section.1.1}
+\begin{longtable}{@{}>{\RaggedRight}p{0.35\linewidth}>{\RaggedRight}p{0.63\linewidth}@{}}
+\caption{Protocol synopsis (generated from the trial model)}\\ \toprule
+\textbf{\small Item} & \textbf{\small Value} \\ \midrule\endfirsthead
+\textbf{\small Item} & \textbf{\small Value} \\ \midrule\endhead
+\small Title & \small Synthetic AD endpoint and rescue linkage example \\
+\small Sponsor & \small --- \\
+\small Phase & \small --- \\
+\small Indication & \small atopic dermatitis \\
+\small Intent & \small --- \\
+\small Planned enrolment & \small --- \\
+\small Primary objective(s) & \small Synthetic efficacy question \\
+\small Primary endpoint(s) & \small EASI-75 response at 16 week after Randomization time \\
+\small Design & \small --- \\
+\bottomrule
+\end{longtable}
+\subsection{1.2\quad Treatment-path diagram}\label{section.1.2}
+\psnote{pswarn}{Generated view: complete the trial model to populate.}
+\subsection{1.3\quad Schedule of activities}\label{section.1.3}
+\psnote{pswarn}{Generated view: complete the trial model to populate.}
+\section{2\quad Scientific justification}\label{section.2}
+\subsection{2.1\quad Disease and unmet need}\label{section.2.1}
+AD is \textbf{chronic} \& relapsing.
+
+\subsection{2.2\quad Mechanism}\label{section.2.2}
+\psnote{pswarn}{Not yet written.}
+\subsection{2.3\quad Nonclinical/clinical evidence}\label{section.2.3}
+\psnote{pswarn}{Not yet written.}
+\subsection{2.4\quad Trial purpose}\label{section.2.4}
+\psnote{pswarn}{Not yet written.}
+\subsection{2.5\quad Benefits}\label{section.2.5}
+\psnote{pswarn}{Not yet written.}
+\subsection{2.6\quad Risks and mitigation}\label{section.2.6}
+\psnote{pswarn}{Not yet written.}
+\subsection{2.7\quad Overall justification}\label{section.2.7}
+\psnote{pswarn}{Not yet written.}
+\section{3\quad Questions and outcomes}\label{section.3}
+\subsection{3.1\quad Repeated primary/secondary/exploratory objectives}\label{section.3.1}
+\begin{longtable}{@{}>{\RaggedRight}p{0.28\linewidth}>{\RaggedRight}p{0.23\linewidth}>{\RaggedRight}p{0.23\linewidth}>{\RaggedRight}p{0.23\linewidth}@{}}
+\caption{Objectives and linked endpoints}\\ \toprule
+\textbf{\small Role} & \textbf{\small Objective} & \textbf{\small Clinical question} & \textbf{\small Endpoint(s)} \\ \midrule\endfirsthead
+\textbf{\small Role} & \textbf{\small Objective} & \textbf{\small Clinical question} & \textbf{\small Endpoint(s)} \\ \midrule\endhead
+\small Primary & \small Synthetic efficacy question & \small Compare the proportion meeting EASI-75 at week 16. & \small EASI-75 response \\
+\bottomrule
+\end{longtable}
+\subsection{3.2\quad Corresponding endpoint definitions and estimands}\label{section.3.2}
+\begin{longtable}{@{}>{\RaggedRight}p{0.28\linewidth}>{\RaggedRight}p{0.17\linewidth}>{\RaggedRight}p{0.17\linewidth}>{\RaggedRight}p{0.17\linewidth}>{\RaggedRight}p{0.17\linewidth}@{}}
+\caption{Endpoint definitions}\\ \toprule
+\textbf{\small Endpoint} & \textbf{\small Assessment} & \textbf{\small Type} & \textbf{\small Transformation} & \textbf{\small Timepoint} \\ \midrule\endfirsthead
+\textbf{\small Endpoint} & \textbf{\small Assessment} & \textbf{\small Type} & \textbf{\small Transformation} & \textbf{\small Timepoint} \\ \midrule\endhead
+\small Absolute EASI change & \small EASI measurement & \small continuous & \small absolute\_change & \small 16 week after Randomization time \\
+\small Percent EASI change & \small EASI measurement & \small continuous & \small percent\_change & \small 16 week after Randomization time \\
+\small EASI-75 response & \small EASI measurement & \small binary & \small responder & \small 16 week after Randomization time \\
+\bottomrule
+\end{longtable}
+\begin{longtable}{@{}>{\RaggedRight}p{0.28\linewidth}>{\RaggedRight}p{0.14\linewidth}>{\RaggedRight}p{0.14\linewidth}>{\RaggedRight}p{0.14\linewidth}>{\RaggedRight}p{0.14\linewidth}>{\RaggedRight}p{0.14\linewidth}@{}}
+\caption{Estimands (ICH E9(R1) attributes)}\\ \toprule
+\textbf{\small Role} & \textbf{\small Estimand} & \textbf{\small Population} & \textbf{\small Variable} & \textbf{\small Summary measure} & \textbf{\small Intercurrent events} \\ \midrule\endfirsthead
+\textbf{\small Role} & \textbf{\small Estimand} & \textbf{\small Population} & \textbf{\small Variable} & \textbf{\small Summary measure} & \textbf{\small Intercurrent events} \\ \midrule\endhead
+\small Primary & \small Synthetic composite response effect & \small Synthetic target population & \small EASI-75 response & \small Active minus comparator & \small Qualifying rescue before week 16: composite \\
+\small Supplementary & \small Synthetic treatment-policy response effect & \small Synthetic target population & \small EASI-75 response & \small Active minus comparator & \small Qualifying rescue before week 16: treatment\_policy \\
+\bottomrule
+\end{longtable}
+\subsection{3.3\quad Region-specific priorities}\label{section.3.3}
+Assessed at Week 12.\psannot{\color{pserr}claim mismatch}
+
+\section{4\quad Design and participant paths}\label{section.4}
+\subsection{4.1\quad Trial type and control}\label{section.4.1}
+\psnote{pswarn}{Not yet written.}
+\subsection{4.2\quad Cohorts}\label{section.4.2}
+\psnote{pswarn}{Not yet written.}
+\subsection{4.3\quad Periods}\label{section.4.3}
+\psnote{pswarn}{Not yet written.}
+\subsection{4.4\quad Allocation and rerandomization}\label{section.4.4}
+\psnote{pswarn}{Not yet written.}
+\subsection{4.5\quad Entry/exit transitions}\label{section.4.5}
+\psnote{pswarn}{Not yet written.}
+\subsection{4.6\quad Duration}\label{section.4.6}
+\psnote{pswarn}{Not yet written.}
+\subsection{4.7\quad Design justification}\label{section.4.7}
+\psnote{pswarn}{Not yet written.}
+\subsection{4.8\quad Interim decisions}\label{section.4.8}
+\psnote{pswarn}{Not yet written.}
+\subsection{4.9\quad Whole-trial stopping}\label{section.4.9}
+\psnote{pswarn}{Not yet written.}
+\subsection{4.10\quad End-of-trial and subsequent access}\label{section.4.10}
+\psnote{pswarn}{Not yet written.}
+\section{5\quad Participant selection}\label{section.5}
+\subsection{5.1\quad Population rationale}\label{section.5.1}
+\psnote{pswarn}{Not yet written.}
+\subsection{5.2\quad Inclusion/exclusion}\label{section.5.2}
+\psnote{pswarn}{Not yet written.}
+\subsection{5.3\quad Prior-treatment definitions}\label{section.5.3}
+\psnote{pswarn}{Not yet written.}
+\subsection{5.4\quad Washout}\label{section.5.4}
+\psnote{pswarn}{Not yet written.}
+\subsection{5.5\quad Reproductive requirements}\label{section.5.5}
+\psnote{pswarn}{Not yet written.}
+\subsection{5.6\quad Lifestyle rules}\label{section.5.6}
+\psnote{pswarn}{Not yet written.}
+\subsection{5.7\quad Screen failures and rescreening}\label{section.5.7}
+\psnote{pswarn}{Not yet written.}
+\section{6\quad Treatments and concomitant care}\label{section.6}
+\subsection{6.1\quad Products and formulations}\label{section.6.1}
+\psnote{pswarn}{Not yet written.}
+\subsection{6.2\quad Dose rationale}\label{section.6.2}
+\psnote{pswarn}{Not yet written.}
+\subsection{6.3\quad Loading/maintenance}\label{section.6.3}
+\psnote{pswarn}{Not yet written.}
+\subsection{6.4\quad Administration}\label{section.6.4}
+\psnote{pswarn}{Not yet written.}
+\subsection{6.5\quad Masking}\label{section.6.5}
+\psnote{pswarn}{Not yet written.}
+\subsection{6.6\quad Preparation/storage/accountability}\label{section.6.6}
+\psnote{pswarn}{Not yet written.}
+\subsection{6.7\quad Adherence}\label{section.6.7}
+\psnote{pswarn}{Not yet written.}
+\subsection{6.8\quad Dose changes}\label{section.6.8}
+\psnote{pswarn}{Not yet written.}
+\subsection{6.9\quad Overdose}\label{section.6.9}
+\psnote{pswarn}{Not yet written.}
+\subsection{6.10\quad Background/rescue/permitted/prohibited therapies}\label{section.6.10}
+\psnote{pswarn}{Not yet written.}
+\section{7\quad Discontinuation and continued observation}\label{section.7}
+\subsection{7.1\quad Temporary interruption}\label{section.7.1}
+\psnote{pswarn}{Not yet written.}
+\subsection{7.2\quad Permanent drug stop}\label{section.7.2}
+\psnote{pswarn}{Not yet written.}
+\subsection{7.3\quad Restart/rechallenge}\label{section.7.3}
+\psnote{pswarn}{Not yet written.}
+\subsection{7.4\quad Stopping one component of combination therapy}\label{section.7.4}
+\psnote{pswarn}{Not yet written.}
+\subsection{7.5\quad Withdrawal from some/all procedures}\label{section.7.5}
+\psnote{pswarn}{Not yet written.}
+\subsection{7.6\quad Consent withdrawal}\label{section.7.6}
+\psnote{pswarn}{Not yet written.}
+\subsection{7.7\quad Lost contact}\label{section.7.7}
+\psnote{pswarn}{Not yet written.}
+\subsection{7.8\quad Follow-up}\label{section.7.8}
+\psnote{pswarn}{Not yet written.}
+\section{8\quad Assessments and procedures}\label{section.8}
+\subsection{8.1\quad Screening/baseline}\label{section.8.1}
+\psnote{pswarn}{Not yet written.}
+\subsection{8.2\quad Efficacy}\label{section.8.2}
+\psnote{pswarn}{Not yet written.}
+\subsection{8.3\quad Patient reports}\label{section.8.3}
+\psnote{pswarn}{Not yet written.}
+\subsection{8.4\quad Clinical safety measurements}\label{section.8.4}
+\psnote{pswarn}{Not yet written.}
+\subsection{8.5\quad PK}\label{section.8.5}
+\psnote{pswarn}{Not yet written.}
+\subsection{8.6\quad PD/biomarkers}\label{section.8.6}
+\psnote{pswarn}{Not yet written.}
+\subsection{8.7\quad Immunogenicity}\label{section.8.7}
+\psnote{pswarn}{Not yet written.}
+\subsection{8.8\quad Specimens}\label{section.8.8}
+\psnote{pswarn}{Not yet written.}
+\subsection{8.9\quad Optional studies}\label{section.8.9}
+\psnote{pswarn}{Not yet written.}
+\subsection{8.10\quad Visit windows}\label{section.8.10}
+\psnote{pswarn}{Not yet written.}
+\subsection{8.11\quad Sequence within visits}\label{section.8.11}
+\psnote{pswarn}{Not yet written.}
+\section{9\quad Safety events and reporting}\label{section.9}
+\subsection{9.1\quad AE/SAE/AESI definitions}\label{section.9.1}
+\psnote{pswarn}{Not yet written.}
+\subsection{9.2\quad Disease-event exceptions}\label{section.9.2}
+\psnote{pswarn}{Not yet written.}
+\subsection{9.3\quad Collection windows}\label{section.9.3}
+\psnote{pswarn}{Not yet written.}
+\subsection{9.4\quad Grading/causality}\label{section.9.4}
+\psnote{pswarn}{Not yet written.}
+\subsection{9.5\quad Reporting clocks and recipients}\label{section.9.5}
+\psnote{pswarn}{Not yet written.}
+\subsection{9.6\quad Pregnancy}\label{section.9.6}
+\psnote{pswarn}{Not yet written.}
+\subsection{9.7\quad Product complaints}\label{section.9.7}
+\psnote{pswarn}{Not yet written.}
+\subsection{9.8\quad Special situations}\label{section.9.8}
+\psnote{pswarn}{Not yet written.}
+\subsection{9.9\quad Outcome follow-up}\label{section.9.9}
+\psnote{pswarn}{Not yet written.}
+\section{10\quad Statistical specification}\label{section.10}
+\subsection{10.1\quad Analysis sets}\label{section.10.1}
+\begin{longtable}{@{}>{\RaggedRight}p{0.35\linewidth}>{\RaggedRight}p{0.63\linewidth}@{}}
+\caption{Analysis sets}\\ \toprule
+\textbf{\small Set} & \textbf{\small Definition} \\ \midrule\endfirsthead
+\textbf{\small Set} & \textbf{\small Definition} \\ \midrule\endhead
+\small All randomized participants & \small All participants assigned by randomization. \\
+\bottomrule
+\end{longtable}
+\begin{longtable}{@{}>{\RaggedRight}p{0.28\linewidth}>{\RaggedRight}p{0.14\linewidth}>{\RaggedRight}p{0.14\linewidth}>{\RaggedRight}p{0.14\linewidth}>{\RaggedRight}p{0.14\linewidth}>{\RaggedRight}p{0.14\linewidth}@{}}
+\caption{Planned analyses}\\ \toprule
+\textbf{\small Role} & \textbf{\small Analysis} & \textbf{\small Estimand} & \textbf{\small Analysis set} & \textbf{\small Method} & \textbf{\small Missing data} \\ \midrule\endfirsthead
+\textbf{\small Role} & \textbf{\small Analysis} & \textbf{\small Estimand} & \textbf{\small Analysis set} & \textbf{\small Method} & \textbf{\small Missing data} \\ \midrule\endhead
+\small Primary & \small Synthetic primary composite analysis & \small Synthetic composite response effect & \small All randomized participants & \small --- & \small --- \\
+\small Supplementary & \small Synthetic supplementary treatment-policy analysis & \small Synthetic treatment-policy response effect & \small All randomized participants & \small --- & \small --- \\
+\bottomrule
+\end{longtable}
+\subsection{10.2\quad Endpoint/estimand-specific estimators}\label{section.10.2}
+\psnote{pswarn}{Not yet written.}
+\subsection{10.3\quad Covariates}\label{section.10.3}
+\psnote{pswarn}{Not yet written.}
+\subsection{10.4\quad Post-event data use}\label{section.10.4}
+\psnote{pswarn}{Not yet written.}
+\subsection{10.5\quad Missing-data assumptions}\label{section.10.5}
+\psnote{pswarn}{Not yet written.}
+\subsection{10.6\quad Sensitivity/supplementary analyses}\label{section.10.6}
+\psnote{pswarn}{Not yet written.}
+\subsection{10.7\quad Testing families}\label{section.10.7}
+\psnote{pswarn}{Not yet written.}
+\subsection{10.8\quad Bayesian priors/decisions if used}\label{section.10.8}
+\psnote{pswarn}{Not yet written.}
+\subsection{10.9\quad Interim analyses}\label{section.10.9}
+\psnote{pswarn}{Not yet written.}
+\subsection{10.10\quad Sample-size rationale}\label{section.10.10}
+\psnote{pswarn}{Not yet written.}
+\section{11\quad Oversight and conduct}\label{section.11}
+\subsection{11.1\quad Ethics and consent/assent}\label{section.11.1}
+\psnote{pswarn}{Not yet written.}
+\subsection{11.2\quad Committees}\label{section.11.2}
+\psnote{pswarn}{Not yet written.}
+\subsection{11.3\quad Monitoring}\label{section.11.3}
+\psnote{pswarn}{Not yet written.}
+\subsection{11.4\quad Quality management}\label{section.11.4}
+\psnote{pswarn}{Not yet written.}
+\subsection{11.5\quad Data governance}\label{section.11.5}
+\psnote{pswarn}{Not yet written.}
+\subsection{11.6\quad Source records}\label{section.11.6}
+\psnote{pswarn}{Not yet written.}
+\subsection{11.7\quad Privacy}\label{section.11.7}
+\psnote{pswarn}{Not yet written.}
+\subsection{11.8\quad Deviations}\label{section.11.8}
+\psnote{pswarn}{Not yet written.}
+\subsection{11.9\quad Site closure}\label{section.11.9}
+\psnote{pswarn}{Not yet written.}
+\subsection{11.10\quad Insurance}\label{section.11.10}
+\psnote{pswarn}{Not yet written.}
+\subsection{11.11\quad Publication and data sharing}\label{section.11.11}
+\psnote{pswarn}{Not yet written.}
+\section{12\quad Supporting material}\label{section.12}
+\subsection{12.1\quad Laboratory panels}\label{section.12.1}
+\psnote{pswarn}{Not yet written.}
+\subsection{12.2\quad Regional addenda}\label{section.12.2}
+\psnote{pswarn}{Not yet written.}
+\subsection{12.3\quad Prior amendments}\label{section.12.3}
+\psnote{pswarn}{Not yet written.}
+\subsection{12.4\quad Instruments and scoring references}\label{section.12.4}
+\psnote{pswarn}{Not yet written.}
+\subsection{12.5\quad Operational detail}\label{section.12.5}
+\psnote{pswarn}{Not yet written.}
+\subsection{12.6\quad Contingency arrangements}\label{section.12.6}
+\psnote{pswarn}{Not yet written.}
+\section{13\quad Terminology}\label{section.13}
+\subsection{13.1\quad Defined terms and abbreviations}\label{section.13.1}
+\psnote{pswarn}{Not yet written.}
+\section{14\quad References}\label{section.14}
+\subsection{14.1\quad Bibliography and linked supporting evidence}\label{section.14.1}
+\psnote{pswarn}{Not yet written.}
+\end{document}
