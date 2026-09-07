@@ -83,6 +83,25 @@ page + document history, never as a numbered section.
 3. Master sheet (Atopic dermatitis): rows per study × arm × endpoint ×
    timepoint; filters; export XLSX.
 
+**Corpus bucket layout (proposed for `s3://sarika-main-fs/`, ADR-017).** The
+ingester reads any key under the prefix; the layout only makes browsing and
+incremental sync cheap. One folder per indication, one per document class,
+original filename kept, `.pdf` and `.md` siblings allowed:
+
+```
+protocol-corpus/
+  atopic-dermatitis/
+    fda-reviews/    <drug>_<application>_<review-type>.pdf|.md
+    protocols/      <sponsor>_<trial-id>_<phase>_prot.pdf|.md
+    saps/           <sponsor>_<trial-id>_sap.pdf|.md
+    labels/         <drug>_label_<yyyy-mm>.pdf
+```
+
+Access is read-only (`ProtocolStudioCorpusReadOnly`); parsed canonical
+JSON/MD, OCR text and thumbnails are written to the app's own
+`protocol-studio-*` bucket keyed by source SHA-256, so re-uploading the same
+file is a no-op.
+
 ✱ Exposed: three of the supplied PDFs are image-only. OCR quality must be
 visible per page and low-confidence values must be `needs_review`, otherwise
 the calculator silently inherits bad numbers.
