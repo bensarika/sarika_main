@@ -52,19 +52,51 @@
     max-width: 96vw;
     height: auto;
   }
-  #hint { font-size: 13px; opacity: .6; max-width: 96vw; text-align: center; }
-  #name {
-    background: #1c0303;
+  #account { display: flex; align-items: center; gap: 12px; font-size: 14px; opacity: .85; min-height: 40px; }
+  #account button {
+    background: none;
     border: 1px solid var(--maroon-light);
     border-radius: 8px;
     color: inherit;
     font: inherit;
-    font-size: 15px;
-    padding: 6px 10px;
-    width: 220px;
-    max-width: 60vw;
+    font-size: 13px;
+    padding: 4px 10px;
+    cursor: pointer;
   }
-  #name:focus { outline: none; border-color: var(--igg); }
+  .modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(20,2,2,0.82);
+    z-index: 10;
+  }
+  .modal[hidden] { display: none; }
+  .modal > div {
+    background: #1c0303;
+    border: 1px solid var(--maroon-light);
+    border-radius: 14px;
+    padding: 24px 26px;
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+  }
+  .modal h2 { margin: 0 0 12px; font-size: 16px; letter-spacing: 2px; font-weight: 600; }
+  .modal p { margin: 0 0 16px; font-size: 15px; line-height: 1.5; opacity: .85; }
+  .modal .err { color: var(--denatured); font-size: 13px; min-height: 18px; margin: 10px 0 0; }
+  .modal .go {
+    background: var(--igg);
+    border: none;
+    border-radius: 8px;
+    color: var(--maroon-deep);
+    font: inherit;
+    font-weight: 600;
+    padding: 10px 22px;
+    cursor: pointer;
+  }
+  #gsi { display: flex; justify-content: center; }
   #stage { display: flex; align-items: flex-start; justify-content: center; gap: 20px; max-width: 96vw; }
   #board {
     width: 240px;
@@ -102,7 +134,7 @@
     </svg>
     <h1>SARIKA PONG</h1>
   </header>
-  <input id="name" type="text" maxlength="16" placeholder="Enter your name" autocomplete="off" />
+  <div id="account"><span id="email"></span><button id="signout" type="button" hidden>Sign out</button></div>
   <div id="hud"><span>Player: <b id="who">Guest</b></span><span>Caught: <b id="score">0</b></span><span>Best: <b id="best">0</b></span><span>Antigen-bound: <b id="bound">10%</b></span></div>
   <div id="stage">
     <canvas id="game" width="480" height="640"></canvas>
@@ -112,16 +144,37 @@
       <ol id="boardList"></ol>
     </aside>
   </div>
-  <div id="hint">Move the FcRn receptor with the mouse, touch, or arrow keys. Catch as many free bispecific antibodies as you can — catching one with a red antigen bound in its arms ends the run, and antigen-bound antibodies get more common the longer you last.</div>
 
+  <div id="login" class="modal">
+    <div>
+      <h2>SIGN IN TO PLAY</h2>
+      <p>SARIKA PONG is for the Sarika team. Sign in with your @sarika.com Google account and your name goes on the leaderboard.</p>
+      <div id="gsi"></div>
+      <p class="err" id="loginErr"></p>
+    </div>
+  </div>
+
+  <div id="howto" class="modal" hidden>
+    <div>
+      <h2>HOW TO PLAY</h2>
+      <p>Move the FcRn receptor with the mouse, touch, or arrow keys. Catch as many free bispecific antibodies as you can — catching one with a red antigen bound in its arms ends the run, and antigen-bound antibodies get more common the longer you last.</p>
+      <button class="go" id="howtoOk" type="button">Got it</button>
+    </div>
+  </div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
-const nameEl = document.getElementById('name');
 const whoEl = document.getElementById('who');
+const emailEl = document.getElementById('email');
+const signoutEl = document.getElementById('signout');
+const loginEl = document.getElementById('login');
+const loginErrEl = document.getElementById('loginErr');
+const howtoEl = document.getElementById('howto');
 const boundEl = document.getElementById('bound');
 const boardListEl = document.getElementById('boardList');
 const boardNoteEl = document.getElementById('boardNote');
@@ -132,22 +185,78 @@ const MEMBRANE_TOP = H - 74;
 const IGG_COLORS = ['#f2c14e', '#7fc8b0', '#e6a0c4', '#8ab6f0'];
 const ANTIGEN = '#e05a5a';
 const LEADERBOARD_URL = 'https://q37j4r35nghu5xy33kjbddk24a0rugrr.lambda-url.us-east-1.on.aws/';
+const GOOGLE_CLIENT_ID = '193093618490-a8b935neih7c7tucj86rkekp829f4e7p.apps.googleusercontent.com';
+const DOMAIN = 'sarika.com';
 
 let best = Number(localStorage.getItem('sarikaPongCaught') || 0);
 bestEl.textContent = best;
 
-let playerName = localStorage.getItem('sparkPongName') || '';
-nameEl.value = playerName;
-whoEl.textContent = playerName || 'Guest';
-nameEl.addEventListener('input', () => {
-  playerName = nameEl.value.trim();
-  whoEl.textContent = playerName || 'Guest';
-  localStorage.setItem('sparkPongName', playerName);
-});
-nameEl.addEventListener('keydown', e => {
-  e.stopPropagation();
-  if (e.key === 'Enter') nameEl.blur();
-});
+// Google ID token for the signed-in player; the Lambda re-verifies it and
+// takes the leaderboard name from the account, so the browser never chooses it.
+let idToken = sessionStorage.getItem('sarikaPongToken') || '';
+let playerName = '';
+let pendingScore = 0;
+
+function claimsOf(token) {
+  try {
+    return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+  } catch {
+    return null;
+  }
+}
+
+function signedIn() {
+  const c = idToken && claimsOf(idToken);
+  return !!(c && c.exp * 1000 > Date.now() && c.hd === DOMAIN);
+}
+
+function showPlayer() {
+  const c = claimsOf(idToken);
+  playerName = c.name || c.email.split('@')[0];
+  whoEl.textContent = playerName;
+  emailEl.textContent = c.email;
+  signoutEl.hidden = false;
+  loginEl.hidden = true;
+  if (!localStorage.getItem('sarikaPongHowto')) {
+    howtoEl.hidden = false;
+    localStorage.setItem('sarikaPongHowto', '1');
+  }
+}
+
+function signOut() {
+  idToken = '';
+  playerName = '';
+  sessionStorage.removeItem('sarikaPongToken');
+  whoEl.textContent = 'Guest';
+  emailEl.textContent = '';
+  signoutEl.hidden = true;
+  loginEl.hidden = false;
+  reset();
+}
+
+function onCredential(res) {
+  const c = claimsOf(res.credential);
+  if (!c || c.hd !== DOMAIN || !c.email.endsWith('@' + DOMAIN)) {
+    loginErrEl.textContent = 'Please use a @' + DOMAIN + ' account.';
+    return;
+  }
+  idToken = res.credential;
+  sessionStorage.setItem('sarikaPongToken', idToken);
+  loginErrEl.textContent = '';
+  showPlayer();
+  if (pendingScore) { submitScore(pendingScore); pendingScore = 0; }
+  reset();
+}
+
+function initGoogle() {
+  if (!window.google) { setTimeout(initGoogle, 100); return; }
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onCredential, hd: DOMAIN, auto_select: true });
+  google.accounts.id.renderButton(document.getElementById('gsi'), { theme: 'filled_black', size: 'large', text: 'signin_with' });
+}
+initGoogle();
+
+signoutEl.addEventListener('click', signOut);
+document.getElementById('howtoOk').addEventListener('click', () => { howtoEl.hidden = true; });
 
 function renderBoard(scores) {
   boardListEl.textContent = '';
@@ -184,14 +293,18 @@ async function loadBoard() {
 
 async function submitScore(finalScore) {
   if (finalScore < 1) return;
+  if (!signedIn()) { pendingScore = finalScore; signOut(); return; }
   try {
     renderBoard(await callBoard({
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: playerName || 'Guest', score: finalScore })
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + idToken },
+      body: JSON.stringify({ score: finalScore })
     }));
-  } catch {
-    boardNoteEl.textContent = 'Score not submitted — leaderboard unavailable.';
+  } catch (err) {
+    boardNoteEl.textContent = /401/.test(err.message)
+      ? 'Session expired — sign in again to post scores.'
+      : 'Score not submitted — leaderboard unavailable.';
+    if (/401/.test(err.message)) { pendingScore = finalScore; signOut(); }
   }
 }
 
@@ -216,10 +329,10 @@ function reset() {
   scoreEl.textContent = score;
 }
 
-const typing = () => document.activeElement === nameEl;
+const blocked = () => !loginEl.hidden || !howtoEl.hidden;
 
 addEventListener('keydown', e => {
-  if (typing()) return;
+  if (blocked()) return;
   keys.add(e.key);
   if (over && (e.key === ' ' || e.key === 'Enter')) reset();
   if (e.key.startsWith('Arrow')) e.preventDefault();
@@ -227,14 +340,14 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => keys.delete(e.key));
 
 function pointerTo(clientX) {
-  if (over) return;
+  if (over || blocked()) return;
   const rect = canvas.getBoundingClientRect();
   const x = (clientX - rect.left) * (W / rect.width);
   player.x = clampX(x);
 }
 canvas.addEventListener('mousemove', e => pointerTo(e.clientX));
 canvas.addEventListener('touchmove', e => { pointerTo(e.touches[0].clientX); e.preventDefault(); }, { passive: false });
-canvas.addEventListener('click', () => { if (over) reset(); });
+canvas.addEventListener('click', () => { if (over && !blocked()) reset(); });
 
 function antibody() {
   const left = Math.floor(Math.random() * IGG_COLORS.length);
@@ -413,10 +526,11 @@ function draw() {
 }
 
 function loop() {
-  if (!over) update();
+  if (!over && !blocked()) update();
   draw();
   requestAnimationFrame(loop);
 }
+if (signedIn()) showPlayer(); else signOut();
 loop();
 </script>
 </body>
