@@ -5,10 +5,9 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from protocol_studio.engine.adaptation import adaptation_summary, build_adaptation
-from protocol_studio.engine.commands import _refresh_claims
 from protocol_studio.engine.evaluation import evaluate
 from protocol_studio.engine.key_inputs import answer, questionnaire
-from protocol_studio.engine.state import DraftState, DrugSpec
+from protocol_studio.engine.state import DraftState, DrugSpec, refresh_claims
 from protocol_studio.engine.textcheck import factual_changes
 from protocol_studio.library import list_starters, starter_state
 from protocol_studio.starters import AD_ANTIBODY_ID
@@ -20,7 +19,7 @@ SAME_CLASS = DrugSpec(name="SRK-301", mechanism="anti-IL-13 antibody")
 
 def _template() -> DraftState:
     st = starter_state(AD_ANTIBODY_ID, protocol_id="W-1", title="SRK-201 in AD", indication="atopic dermatitis")
-    _refresh_claims(st)
+    refresh_claims(st)
     return st
 
 
@@ -190,7 +189,7 @@ def test_key_inputs_write_through_and_flag_claims() -> None:
     written, sections = answer(st, "primary_timepoint_weeks", 12, actor="t", now="n")
     assert "periods[treatment].duration.value" in written and len(written) >= 6
     assert "section.10" in sections
-    _refresh_claims(st)
+    refresh_claims(st)
     ev = evaluate(st)
     assert any("Week 16" in f["message"] for f in ev["findings"])  # bound prose now disagrees
     answer(st, "rescue_strategy", "hypothetical", actor="t", now="n")

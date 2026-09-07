@@ -4,6 +4,8 @@
     POST /api/works/{id}/versions                  freeze head: snapshot + evaluation + artifacts
     GET  /api/works/{id}/versions/{label}          one version (evaluation + artifact hashes)
     GET  /api/works/{id}/versions/{label}/file/{kind}   download pdf|docx|tex of a frozen version
+    GET  /api/works/{id}/versions/{label}/diff?against=head|<label>   model + tracked-change block diff
+    POST /api/works/{id}/versions/{label}/restore  restore the snapshot as a NEW head revision
     GET  /api/works/{id}/export/{kind}             render the *working draft* head (pdf|docx|tex)
 
 Freezing does not require readiness — a team may freeze "v0.3 for internal
@@ -22,11 +24,14 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from protocol_studio.api.works import adjudication_map, load_state
+from protocol_studio.api.works import adjudication_map, load_state, persist_revision
 from protocol_studio.auth.session import audit, current_user, require_work
 from protocol_studio.db import User, Version, Work, get_session
+from protocol_studio.engine.commands import ConflictError, apply_restore
+from protocol_studio.engine.diff import diff_states
 from protocol_studio.engine.evaluation import evaluate
 from protocol_studio.engine.export import draft_export_dir, render_all, version_export_dir
+from protocol_studio.engine.state import DraftState
 
 router = APIRouter(prefix="/api/works", tags=["versions"])
 
@@ -132,6 +137,56 @@ def version_file(
     if v is None or not v.artifacts.get(kind, {}).get("path"):
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"no {kind} for {label}")
     return FileResponse(v.artifacts[kind]["path"], media_type=_KINDS[kind], filename=f"{work.id}-{label}.{kind}")
+
+
+def _load_version(db: Session, work: Work, label: str) -> Version:
+    v = db.scalar(select(Version).where(Version.work_id == work.id, Version.label == label))
+    if v is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"no version {label}")
+    return v
+
+
+@router.get("/{work_id}/versions/{label}/diff")
+def version_diff(
+    label: str,
+    against: str = "head",
+    work: Work = Depends(require_work("view")),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Diff ``label`` → ``against`` (the working head by default, or another frozen label)."""
+    old = DraftState.model_validate(_load_version(db, work, label).snapshot)
+    if against == "head":
+        new = load_state(db, work.id)
+    else:
+        new = DraftState.model_validate(_load_version(db, work, against).snapshot)
+    return {"from": label, "to": against, **diff_states(old, new)}
+
+
+class Restore(BaseModel):
+    base_revision: int
+    note: str = ""
+
+
+@router.post("/{work_id}/versions/{label}/restore")
+def restore_version(
+    label: str,
+    body: Restore,
+    work: Work = Depends(require_work("edit")),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    v = _load_version(db, work, label)
+    state = load_state(db, work.id)
+    try:
+        new_state, summary = apply_restore(
+            state, DraftState.model_validate(v.snapshot), base_revision=body.base_revision, label=label
+        )
+    except ConflictError as e:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, {"error": "stale", "head": state.revision, "detail": str(e)}
+        ) from e
+    command = {"type": "restore_version", "base_revision": body.base_revision, "label": label, "note": body.note}
+    return persist_revision(db, work, user, new_state, command=command, summary=summary)
 
 
 @router.get("/{work_id}/export/{kind}")

@@ -24,6 +24,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from ps_model.completion import NarrativeState
+from ps_rules.rules_claims import check_claims
 
 
 class Claim(BaseModel):
@@ -154,3 +155,12 @@ class DraftState(BaseModel):
             if b.id == block_id:
                 return b
         raise KeyError(block_id)
+
+
+def refresh_claims(s: DraftState) -> None:
+    """Re-check every narrative claim against the current model (checked / mismatch / unbound ...)."""
+    for b in s.blocks:
+        if not b.claims:
+            continue
+        fresh = check_claims(s.model, [c.model_dump() for c in b.claims])
+        b.claims = [Claim(**{k: v for k, v in f.items() if k in Claim.model_fields}) for f in fresh]

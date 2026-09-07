@@ -25,11 +25,10 @@ from pydantic import BaseModel, Field
 
 from protocol_studio.engine import adaptation as adapt
 from protocol_studio.engine import key_inputs
-from protocol_studio.engine.state import Block, Claim, DraftState, DrugSpec, Proposal
+from protocol_studio.engine.state import Block, Claim, DraftState, DrugSpec, Proposal, refresh_claims
 from protocol_studio.engine.textcheck import factual_changes
 from ps_model.paths import PathError, delete_path, get_path, set_path
 from ps_model.schema import validate_model
-from ps_rules.rules_claims import check_claims
 
 
 class ConflictError(Exception):
@@ -210,8 +209,25 @@ def apply_command(state: DraftState, cmd: Command, *, actor: str) -> tuple[Draft
     new = state.model_copy(deep=True)
     summary = _dispatch(new, cmd, actor)
     new.revision += 1
-    _refresh_claims(new)
+    refresh_claims(new)
     return new, summary
+
+
+def apply_restore(state: DraftState, snapshot: DraftState, *, base_revision: int, label: str) -> tuple[DraftState, str]:
+    """Restore a frozen snapshot as a *new* head revision — history is append-only, nothing is rewound.
+
+    Block approvals are reset to ``unreviewed``: the prose is the same as when it was approved, but the
+    surrounding document may not be, so the restore itself is what needs review.
+    """
+    if base_revision != state.revision:
+        raise ConflictError(f"base_revision {base_revision} != head {state.revision}")
+    new = snapshot.model_copy(deep=True)
+    for b in new.blocks:
+        b.approval = "unreviewed"
+        b.proposal = None
+    new.revision = state.revision + 1
+    refresh_claims(new)
+    return new, f"Restored version {label} (revision {snapshot.revision}) as revision {new.revision}"
 
 
 def _dispatch(s: DraftState, cmd: Command, actor: str) -> str:
@@ -414,11 +430,3 @@ def _block(s: DraftState, block_id: str) -> Block:
         return s.block(block_id)
     except KeyError as e:
         raise CommandError(f"no block {block_id}") from e
-
-
-def _refresh_claims(s: DraftState) -> None:
-    for b in s.blocks:
-        if not b.claims:
-            continue
-        fresh = check_claims(s.model, [c.model_dump() for c in b.claims])
-        b.claims = [Claim(**{k: v for k, v in f.items() if k in Claim.model_fields}) for f in fresh]

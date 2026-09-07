@@ -19,17 +19,24 @@ env vars for real Google Sign-In (Internal audience, `@sarika.com` only).
 | --- | --- |
 | `main.py` | App factory: lifespan (DB init), session + CORS middleware, routers, `/healthz`, optional static serving of `apps/web/dist`. |
 | `settings.py` | `Settings` (pydantic-settings, `PS_` prefix). DB URL, data dir, secret key, auth mode, admin allowlist, Google client, CORS. |
-| `db.py` | SQLAlchemy 2 ORM: `User`, `Work`, `Permission`, `Draft` (one mutable head per work), `Revision` (append-only command log), `Version` (immutable freeze), `Adjudication`, `AuditEvent`. SQLite by default with FK enforcement; Postgres by URL. |
-| `library.py` | Starters: `blank` and `example:<id>` (from `reference/protocol_examples.json`, converted to an authored draft). |
-| `engine/state.py` | `DraftState` = model + narrative `Block`s (+ `Claim`s) + not-applicable declarations + revision. |
-| `engine/commands.py` | Typed commands (`set_field`, `add_entity`, `remove_entity`, `upsert_block`, `delete_block`, `set_block_approval`, `set_claim`, `resolve_claim`, `set_not_applicable`) and `apply_command()`. |
+| `db.py` | SQLAlchemy 2 ORM: `User`, `Work` (+ study code, phase, drugs, status, data class), `Permission`, `Draft` (one mutable head per work), `Revision` (append-only command log), `Version` (immutable freeze), `Adjudication`, `AuditEvent`, `Comment`, `Presence`, `AccessRequest`, `ProviderPolicy`, `SourceRecord`. SQLite by default with FK enforcement; Postgres by URL. |
+| `library.py` | Starters: `blank`, `synthetic:ad-antibody-p2b` (rich synthetic AD antibody protocol, see `starters/`) and `example:<id>` (from `reference/protocol_examples.json`). Claims are bound on creation. |
+| `starters/ad_antibody.py` | The synthetic starter: full model + narrative blocks with claims across all 14 sections. Explicitly illustrative, never a real protocol. |
+| `engine/state.py` | `DraftState` = model + narrative `Block`s (+ `Claim`s, pending `Proposal`) + not-applicable declarations + `Adaptation` + typed `key_inputs` + revision; `refresh_claims()`. |
+| `engine/commands.py` | Typed commands (`set_field`, `add_entity`, `remove_entity`, `upsert_block`, `delete_block`, `set_block_approval`, `set_claim`, `resolve_claim`, `set_not_applicable`, `start_adaptation`, `decide_adaptation_change`, `set_evidence_requirement`, `answer_key_input`, `propose_text`, `resolve_proposal`), `apply_command()` and `apply_restore()`. |
+| `engine/adaptation.py` | Starter → new drug(s): classifies every block/model value as retain / rewrite / remove / add / evidence with a clinical question and the evidence needed. Never find-and-replace; nothing applies until accepted. |
+| `engine/key_inputs.py` | Grouped key-input questionnaire derived from unresolved adaptation changes; typed answers write to model paths and re-propose narrative. |
+| `engine/textcheck.py` | Deterministic factual-change detection between a block and a proposed rewrite (numbers/units, negation, modals, actors, dropped claim phrases). |
+| `engine/diff.py` | Pure diff between two `DraftState`s: dotted-path model changes + word-level tracked changes per block. |
 | `engine/evaluation.py` | `evaluate(state, adjudications)` → findings (revision-stamped), completion per section/overall, readiness + blockers. |
 | `engine/export.py` | `render_all()` → `.tex`, `.docx`, `.pdf` (if Tectonic) with SHA-256s; draft exports under `data/exports/<work>/rev-N/`, frozen under `data/versions/<work>/<label>/`. |
 | `auth/session.py` | Signed session cookie, `current_user`, `require_admin`, per-work ACL (`view` < `edit` < `admin`), `audit()`. |
 | `auth/routes.py` | `/auth/me`, `/auth/config`, `/auth/dev-login`, `/auth/google/login|callback`, `/auth/logout`. |
-| `api/works.py` | Works CRUD, draft read, **commands**, evaluation, adjudications, history, outline, permissions. |
-| `api/versions.py` | List/freeze/read versions, download frozen artifacts, draft export. |
-| `api/admin.py` | Users (invite/activate/role), audit log, usage counts. The primary admin cannot be demoted. |
+| `api/works.py` | Works CRUD (+ metadata patch), draft read, **commands**, evaluation, adjudications, history, outline, permissions, adaptation summary, key-input questionnaire, pending proposals. |
+| `api/versions.py` | List/freeze/read versions, download frozen artifacts, draft export, `GET …/versions/{label}/diff?against=head|<label>`, `POST …/versions/{label}/restore` (new revision; approvals reset). |
+| `api/collab.py` | Comment threads and suggestions (view access), `…/comments/{id}/apply` → pending `propose_text`, presence heartbeat, access requests (request / decide / mine). |
+| `api/trial_lab.py` | `/api/trial-lab/sample-size`, `/profiles`, `/explore` over `packages/stats`. |
+| `api/admin.py` | Users (invite/activate/role), audit log, usage per period (`/usage`, `/usage.csv`), pending access requests across works. The primary admin cannot be demoted. |
 | `api/library.py` | Starters, outline, rule catalogue (with implemented/planned status), JSON schema. |
 
 ## Edit/commit contract
@@ -63,12 +70,32 @@ snapshot, evaluation (with `ready` and `blockers`), artifacts and hashes. A
 freeze of an incomplete draft is allowed for internal review but is never
 marked ready. `GET /api/works/{id}/export/{tex|docx|pdf}` renders the live draft.
 
+History is append-only: **restore** replays a frozen snapshot as a *new* head
+revision (block approvals reset to `unreviewed`, pending proposals dropped) and
+requires the caller's `base_revision` like any command. **Diff** compares a
+version to the head or another version: model changes by dotted path
+(`endpoints[easi75].time.offset.value`), narrative as word-level
+insert/delete ops per block.
+
+## Collaboration
+
+Comments are review metadata, not document content — they never enter
+exports, versions or the revision counter. A *suggestion* carries
+`suggested_text` for a block; an editor can **apply** it, which creates a
+pending `propose_text` (with deterministic factual-change checks) that still
+needs accept/reject. Viewers may comment and suggest; resolving needs edit
+access or authorship. Access requests bypass the work ACL by design and are
+decided by a work admin, which writes the `Permission` row.
+
 ## Tests
 
-`apps/api/tests/test_api.py` (temp SQLite per test, dev auth):
-auth/ACL, stale-command 409, schema 422, starters, entities, claim mismatch and
-both resolutions, approval-driven completion, not-applicable + adjudication
-staleness, freeze, DOCX/LaTeX export, admin usage/audit.
+Temp SQLite per test, dev auth. `test_api.py`: auth/ACL, stale-command 409,
+schema 422, starters, entities, claim mismatch and both resolutions,
+approval-driven completion, not-applicable + adjudication staleness, freeze,
+DOCX/LaTeX export, admin usage/audit. `test_authoring.py`: synthetic starter,
+adaptation classification, key inputs, factual-change detection, text
+proposals, Trial Lab. `test_collab.py`: comment threads, suggestion → proposal,
+presence, access-request flow, version diff/restore, usage periods + CSV.
 
 ```
 uv run pytest apps/api

@@ -284,19 +284,32 @@ def post_command(
         ) from e
     except CommandError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
+    return persist_revision(db, work, user, new_state, command=cmd.model_dump(), summary=summary)
 
+
+def persist_revision(
+    db: Session, work: Work, user: User, new_state: DraftState, *, command: dict[str, Any], summary: str
+) -> dict[str, Any]:
+    """Write a new head + append-only Revision + audit row, then return the standard command response.
+
+    Shared by the command route, version restore and applied comment suggestions so every
+    head change goes through exactly one code path.
+    """
     d = db.get(Draft, work.id)
     assert d is not None
     d.state = new_state.model_dump(exclude={"revision"})
     d.revision = new_state.revision
     d.updated_at = datetime.now(UTC)
     work.updated_at = d.updated_at
-    db.add(
-        Revision(
-            work_id=work.id, revision=new_state.revision, actor_id=user.id, command=cmd.model_dump(), summary=summary
-        )
+    db.add(Revision(work_id=work.id, revision=new_state.revision, actor_id=user.id, command=command, summary=summary))
+    audit(
+        db,
+        actor=user,
+        action=f"command.{command.get('type', 'unknown')}",
+        work_id=work.id,
+        revision=new_state.revision,
+        summary=summary,
     )
-    audit(db, actor=user, action=f"command.{cmd.type}", work_id=work.id, revision=new_state.revision, summary=summary)
     db.commit()
     return {
         "revision": new_state.revision,

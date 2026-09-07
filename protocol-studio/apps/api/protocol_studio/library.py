@@ -22,7 +22,7 @@ import json
 from functools import lru_cache
 from typing import Any
 
-from protocol_studio.engine.state import Block, DraftState
+from protocol_studio.engine.state import Block, DraftState, refresh_claims
 from protocol_studio.starters import AD_ANTIBODY_ID, ad_antibody_blocks, ad_antibody_model
 from ps_model.schema import empty_model, reference_dir
 
@@ -103,7 +103,9 @@ def starter_state(starter: str, *, protocol_id: str, title: str, indication: str
         blocks = ad_antibody_blocks()
         for b in blocks:
             b.approval = "unreviewed"  # approvals belong to a study, never to a template
-        return DraftState(model=model, blocks=blocks)
+        st = DraftState(model=model, blocks=blocks)
+        refresh_claims(st)
+        return st
     if starter.startswith("example:"):
         src = _examples().get(starter.removeprefix("example:"))
         if src is None:

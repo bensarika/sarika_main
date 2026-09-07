@@ -158,6 +158,25 @@ class Presence(Base):
     seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class AccessRequest(Base):
+    """A user asking for view/edit access to a work they can see exists but cannot open.
+
+    Decided by the work owner, a work admin, or a global admin; approval writes a Permission row.
+    """
+
+    __tablename__ = "access_requests"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    work_id: Mapped[str] = mapped_column(ForeignKey("works.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    level: Mapped[str] = mapped_column(String(16), default="view")  # view | edit
+    message: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | approved | denied
+    decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    decision_note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ProviderPolicy(Base):
     """Which model provider may receive which data class. Absent row = not approved (fail closed)."""
 
