@@ -1,0 +1,1 @@
+{"root":["./src/main.tsx","./src/components/AnalysisPane.tsx","./src/components/BlockEditor.tsx","./src/components/Frame.tsx","./src/lib/api.ts","./src/lib/session.tsx","./src/lib/useDraft.ts","./src/pages/Admin.tsx","./src/pages/Editor.tsx","./src/pages/Library.tsx","./src/pages/Login.tsx","./src/pages/NewWork.tsx"],"version":"5.9.3"}

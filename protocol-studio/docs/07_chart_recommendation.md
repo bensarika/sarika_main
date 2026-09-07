@@ -132,12 +132,15 @@ Row layout (y in row units, top → bottom):
 def y_layout(order, with_user, gap=0.7):
     pos, y = {}, 0.0
     if with_user:
-        pos["USER"] = y; y -= 1.25          # user row + a slightly larger gap
+        pos["USER"] = y
+        y -= 1.25  # user row + a slightly larger gap
     seen_excluded = False
     for i, row in enumerate(order):
         if not row.comparable and not seen_excluded:
-            y -= gap; seen_excluded = True   # divider sits at pos[i] + 0.5 + gap/2
-        pos[i] = y; y -= 1.0
+            y -= gap
+            seen_excluded = True  # divider sits at pos[i] + 0.5 + gap/2
+        pos[i] = y
+        y -= 1.0
     return pos
 ```
 
