@@ -77,7 +77,8 @@ const $ = (t, c, x) => { const e = document.createElement(t); if (c) e.className
 let runId = null, uploaded = null, sideNames = [], uploadedAt = null;
 const panels = new Map();
 const COLOUR = { observed: '#13a34a', reject: '#e63563', unresolved: '#e3a413',
-                 candidate: '#1f6feb', mark: '#8957e5', crowded: '#e3a413' };
+                 candidate: '#1f6feb', mark: '#8957e5', crowded: '#e3a413',
+                 placed: '#00d0ff', placed_not: '#f85149' };
 
 fetch('/config').then(r => r.json()).then(c => { query.value = c.query; sideNames = c.sides; });
 
@@ -90,10 +91,11 @@ function viewer(host) {
   host.append(empty);
   const context = canvas.getContext('2d');
   const v = {
-    image: null, scale: 1, x: 0, y: 0, fitted: false,
-    layers: { marks: true, candidates: true, reading: true, axes: true, ids: true },
+    image: null, scale: 1, x: 0, y: 0, fitted: false, path: null,
+    layers: { marks: true, candidates: true, reading: true, axes: true, ids: true, placed: true },
     marks: [], predicted: [], plot: null, ticks: null, candidates: [], screen: new Map(), rows: [],
-    onhover: () => {}
+    placed: [], placing: false,
+    onhover: () => {}, onplace: () => {}
   };
   v.load = src => {
     const image = new Image();
@@ -145,6 +147,22 @@ function viewer(host) {
         context.stroke();
       }
       context.setLineDash([]);
+    }
+    // What a person put on the figure by hand outranks anything a reader said
+    // about the same spot, so it is drawn on top and in its own shape.
+    if (v.layers.placed) {
+      for (const m of v.placed) {
+        const side = font * 1.1;
+        context.strokeStyle = m.kind === 'not_data' ? COLOUR.placed_not : COLOUR.placed;
+        context.strokeRect(m.x - side / 2, m.y - side / 2, side, side);
+        segment(m.x - side, m.y, m.x + side, m.y);
+        segment(m.x, m.y - side, m.x, m.y + side);
+        if (v.layers.ids) {
+          context.fillStyle = context.strokeStyle;
+          context.fillText((m.kind === 'not_data' ? 'not data' : (m.group || 'by hand')),
+            m.x + font, m.y + font);
+        }
+      }
     }
     for (const point of v.points()) {
       context.strokeStyle = point.colour;
@@ -200,11 +218,20 @@ function viewer(host) {
     v.y = oy - (oy - v.y) * (next / v.scale);
     v.scale = next; v.place();
   }, { passive: false });
-  let dragging = null;
-  host.addEventListener('mousedown', e => { dragging = { x: e.clientX - v.x, y: e.clientY - v.y }; host.classList.add('dragging'); });
+  let dragging = null, travelled = 0;
+  host.addEventListener('mousedown', e => { dragging = { x: e.clientX - v.x, y: e.clientY - v.y }; travelled = 0; host.classList.add('dragging'); });
   addEventListener('mouseup', () => { dragging = null; host.classList.remove('dragging'); });
+  // A click while placing is a datapoint; a drag is still a drag, so a pan that
+  // ends over the plot does not leave a mark behind.
+  host.addEventListener('click', event => {
+    if (!v.image || !v.placing || travelled > 3) return;
+    const rect = host.getBoundingClientRect();
+    v.onplace((event.clientX - rect.left - v.x) / v.scale,
+              (event.clientY - rect.top - v.y) / v.scale);
+  });
   host.addEventListener('mousemove', event => {
-    if (dragging) { v.x = event.clientX - dragging.x; v.y = event.clientY - dragging.y; v.place(); return; }
+    if (dragging) { travelled += Math.abs(event.movementX) + Math.abs(event.movementY);
+                    v.x = event.clientX - dragging.x; v.y = event.clientY - dragging.y; v.place(); return; }
     if (!v.image) return;
     const rect = host.getBoundingClientRect();
     const point = v.at((event.clientX - rect.left - v.x) / v.scale, (event.clientY - rect.top - v.y) / v.scale);
@@ -258,6 +285,37 @@ function panel(side) {
   }
   const fit = $('button', null, 'fit'); fit.onclick = () => { v.fit(); }; tools.append(fit);
   root.append(tools);
+  // Anything a person marks by hand is measured against the same pixels the
+  // readers are held to, drawn on both panes, and handed to this side's next
+  // pass as a correction - a reader that keeps missing a point can be shown it.
+  const hand = $('div', 'tools');
+  const arm = $('button', null, 'place points');
+  const group = document.createElement('input');
+  group.placeholder = 'group (e.g. bbmAb2)'; group.size = 16;
+  const kind = document.createElement('select');
+  for (const [value, text] of [['data', 'a datapoint'], ['not_data', 'not a datapoint']]) {
+    const option = document.createElement('option');
+    option.value = value; option.textContent = text; kind.append(option);
+  }
+  const said = $('span', null, '');
+  hand.append(arm, group, kind, said);
+  root.append(hand);
+  arm.onclick = () => {
+    v.placing = !v.placing;
+    arm.textContent = v.placing ? 'placing — click the figure' : 'place points';
+    arm.style.background = v.placing ? '#00838f' : '';
+    view.style.cursor = v.placing ? 'crosshair' : '';
+  };
+  v.onplace = async (x, y) => {
+    if (!runId || !v.path) return;
+    const body = JSON.stringify({ image: v.path, x, y, group: group.value.trim() || null,
+                                 kind: kind.value });
+    const posted = await fetch('/marks?' + new URLSearchParams({ run: runId, side }),
+                               { method: 'POST', body });
+    const answer = await posted.json();
+    said.textContent = posted.ok ? (answer.measured && answer.measured.reading) || 'marked'
+                                 : 'not marked: ' + (answer.error || posted.status);
+  };
   const hover = $('div', 'hover', 'hover a point to see what it was read as');
   v.onhover = text => { hover.textContent = text || 'hover a point to see what it was read as'; };
   root.append(hover);
@@ -325,6 +383,21 @@ function panel(side) {
   return p;
 }
 
+function placedMark(p, e) {
+  // A mark is in the coordinates of the image it was clicked on, so it is drawn
+  // on the panes showing that same image and only reported on the others.
+  if (p.view.path === e.mark.image) {
+    p.view.placed = p.view.placed.filter(m => m.at !== e.mark.at).concat([e.mark]);
+    p.view.draw();
+  }
+  p.say((e.mark.kind === 'not_data' ? 'a watcher says there is no datapoint at '
+         : 'a watcher marked a datapoint at ')
+        + Math.round(e.mark.x) + ',' + Math.round(e.mark.y)
+        + (e.mark.group ? ' (' + e.mark.group + ')' : '')
+        + (e.mark.carried_onto_the_ink ? ', carried onto the ink under the click' : '')
+        + '; ' + ((e.mark.measured || {}).reading || ''), 'watcher');
+}
+
 function show(p, key, node) { const b = p.blocks[key]; b.box.hidden = false; b.replaceChildren(node); }
 
 function version(p, title, path, summary) {
@@ -374,7 +447,7 @@ const render = {
     p.status.textContent = 'sheet printed sideways — rotating ' + e.clockwise + '°';
     p.say('the sheet is printed sideways, rotating it ' + e.clockwise + '°');
   },
-  image(p, e) { p.view.load(url(e.path)); },
+  image(p, e) { p.view.path = e.path; p.view.load(url(e.path)); },
   axes(p, e) {
     p.view.plot = e.plot_bbox;
     p.view.ticks = { x: e.x_ticks || [], y: e.y_ticks || [] };
@@ -554,6 +627,10 @@ function handle(e) {
       + (e.iterated.length ? '; second pass for ' + e.iterated.join(', ') : ''), 'adjudication');
     agree.textContent = (e.agrees ? 'readings agree (evidence, not proof)' : 'readings disagree — see duel_report.json')
       + (e.iterated.length ? ' · second pass: ' + e.iterated.join(', ') : '');
+    return;
+  }
+  if (e.kind === 'placed_mark') {
+    for (const p of panels.values()) placedMark(p, e);
     return;
   }
   if (!e.side || e.side === 'both') {

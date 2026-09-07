@@ -164,6 +164,70 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(404, self.post('/notes?run=nope&side=grok&target=model', b'hi')[0])
         self.assertEqual([], run.notes)
 
+    def placeable(self, run):
+        """A run with a figure on disk a watcher can point at."""
+        from tests.test_placed import figure
+        (run.dir / 'panel').mkdir(parents=True, exist_ok=True)
+        figure(run.dir / 'panel' / 'page.png')
+        (run.dir / 'detected_marks.json').write_text(
+            json.dumps({'pooled': [{'x': 40, 'y': 30, 'width': 9}]}))
+        return 'panel/page.png'
+
+    def marked(self, run, side, image, x, y, group=None, kind='data'):
+        body = json.dumps({'image': image, 'x': x, 'y': y, 'group': group,
+                           'kind': kind}).encode()
+        return self.post('/marks?run=%s&side=%s' % (run.id, side), body)
+
+    def test_a_placed_mark_is_measured_kept_and_handed_to_that_side(self):
+        _, body, _ = self.run_upload()
+        run = self.harness.runs[body['run']]
+        image = self.placeable(run)
+        status, mark = self.marked(run, 'grok', image, 42, 31, 'bbmAb2')
+        self.assertEqual(status, 200)
+        self.assertTrue(mark['carried_onto_the_ink'])
+        self.assertAlmostEqual(mark['x'], 40, delta=1)
+        self.assertEqual(mark['image'], image)
+        kept = [json.loads(l) for l in
+                (run.dir / 'placed_marks.jsonl').read_text().splitlines()]
+        self.assertEqual(['bbmAb2'], [m['group'] for m in kept])
+        handed = run.notes_for('grok')
+        self.assertEqual(1, len(handed))
+        self.assertIn('bbmAb2', handed[0])
+        self.assertEqual([], run.notes_for('muse'))
+        self.assertEqual('placed_mark', run.events[-1]['kind'])
+
+    def test_a_mark_on_blank_paper_is_recorded_as_pointing_at_nothing(self):
+        _, body, _ = self.run_upload()
+        run = self.harness.runs[body['run']]
+        image = self.placeable(run)
+        _, mark = self.marked(run, 'both', image, 100, 80, None, 'not_data')
+        self.assertFalse(mark['measured']['on_ink'])
+        self.assertEqual((mark['x'], mark['y']), (100, 80))
+        self.assertIn('no datapoint', run.notes_for('grok')[0])
+        self.assertIn('no datapoint', run.notes_for('muse')[0])
+
+    def test_placed_marks_reach_the_corrections_the_next_pass_reads(self):
+        _, body, _ = self.run_upload()
+        run = self.harness.runs[body['run']]
+        self.marked(run, 'grok', self.placeable(run), 40, 30, 'bbmAb2')
+        corrections = run.dir / 'feedback.md'
+        corrections.write_text('measured corrections')
+        self.harness._with_notes(run, run.sides[0], str(corrections))
+        self.assertIn('bbmAb2', corrections.read_text())
+
+    def test_a_mark_is_refused_for_an_unknown_run_side_image_or_kind(self):
+        _, body, _ = self.run_upload()
+        run = self.harness.runs[body['run']]
+        image = self.placeable(run)
+        self.assertEqual(404, self.post('/marks?run=nope&side=grok',
+                                        json.dumps({'image': image, 'x': 1, 'y': 1}).encode())[0])
+        self.assertEqual(400, self.marked(run, 'nobody', image, 40, 30)[0])
+        self.assertEqual(400, self.marked(run, 'grok', '../../secret.png', 40, 30)[0])
+        self.assertEqual(400, self.marked(run, 'grok', 'panel/missing.png', 40, 30)[0])
+        self.assertEqual(400, self.marked(run, 'grok', image, 40, 30, 'a', 'maybe')[0])
+        self.assertEqual(400, self.post('/marks?run=%s&side=grok' % run.id, b'{}')[0])
+        self.assertEqual([], run.placed)
+
     def test_an_unknown_run_has_no_event_stream(self):
         with self.assertRaises(urllib.error.HTTPError) as missing:
             self.get('/events?run=nope')

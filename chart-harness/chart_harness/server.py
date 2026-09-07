@@ -25,6 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+from . import placed
 from . import progress
 from .cli import adjudicate, batch, duel_sides, source_context
 
@@ -47,6 +48,7 @@ class Run:
         self.done = False
         self.lock = threading.Lock()
         self.notes = []
+        self.placed = []
 
     def publish(self, event):
         with self.lock:
@@ -91,7 +93,49 @@ class Run:
 
     def notes_for(self, side):
         return [n['text'] for n in self.notes
-                if n['target'] == 'model' and n['side'] == side]
+                if n['target'] == 'model' and n['side'] == side] + [
+                placed.sentence(m) for m in self.placed
+                if m['side'] in (side, 'both')]
+
+    def place(self, side, image, x, y, group=None, kind='data'):
+        """A mark a watcher put on the figure: measured, kept, and handed on.
+
+        The click is checked against the pixels under it rather than taken on
+        trust - carried onto the ink body it was aimed at, or recorded as
+        pointing at blank paper - and then travels to the reader as a correction
+        for its next pass, the same way a written remark does.
+        """
+        if side != 'both' and side not in [s['name'] for s in self.sides]:
+            raise ValueError('unknown side: ' + side)
+        target = self._within(image)
+        mark = placed.place(target, x, y, group, kind,
+                            reach=self._mark_size(target))
+        mark['side'] = side
+        mark['image'] = str(Path(image))
+        self.placed.append(mark)
+        placed.record(self.dir, mark)
+        self.publish({'kind': 'placed_mark', 'at': mark['at'], 'side': side,
+                      'mark': mark})
+        return mark
+
+    def _within(self, image):
+        """An image path is only ever one inside this run's own directory."""
+        target = (self.dir / image).resolve()
+        target.relative_to(self.dir.resolve())
+        if not target.is_file():
+            raise ValueError('no such image in this run: ' + str(image))
+        return target
+
+    def _mark_size(self, image):
+        """How big a mark is on this figure, from what python already measured."""
+        sizes = []
+        for found in self.dir.rglob('detected_marks.json'):
+            try:
+                marks = json.loads(found.read_text()).get('pooled') or []
+            except (OSError, ValueError):
+                continue
+            sizes += [m.get('width') for m in marks if m.get('width')]
+        return placed.reach_from(sizes)
 
     def unsubscribe(self, listener):
         with self.lock:
@@ -138,6 +182,8 @@ class Harness:
     def _with_notes(self, run, side, context_file):
         """Hand the watcher's remarks to the next pass along with the corrections."""
         watching = run.notes_for(side['name'])
+        # A correction is worth nothing if it only reaches the log; it is handed
+        # to the next pass as context, to be weighed against the pixels.
         if not watching or not context_file:
             return context_file
         path = Path(context_file)
@@ -232,6 +278,20 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         url = urlsplit(self.path)
         params = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if url.path == '/marks':
+            run = self.harness.runs.get(params.get('run', ''))
+            if run is None:
+                return self._json(404, {'error': 'unknown run'})
+            length = int(self.headers.get('Content-Length') or 0)
+            body = self.rfile.read(min(length, 8192)).decode('utf-8', 'replace')
+            try:
+                asked = json.loads(body or '{}')
+                return self._json(200, run.place(
+                    params.get('side', 'both'), asked['image'],
+                    float(asked['x']), float(asked['y']),
+                    asked.get('group'), asked.get('kind', 'data')))
+            except (ValueError, KeyError, TypeError) as error:
+                return self._json(400, {'error': str(error)})
         if url.path == '/notes':
             run = self.harness.runs.get(params.get('run', ''))
             if run is None:
