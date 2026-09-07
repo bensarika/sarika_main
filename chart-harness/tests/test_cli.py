@@ -134,6 +134,40 @@ class CLITests(unittest.TestCase):
             result = batch(self.args('nolegend'))
         self.assertEqual(1, len(result['panels']))
 
+    def test_a_reader_declining_the_page_still_reports_the_ink_it_can_measure(self):
+        """A reader's refusal is an opinion about the page, not the end of the run."""
+        image=Image.open(self.source)
+        draw=ImageDraw.Draw(image)
+        draw.line((20,140,180,140),fill='black',width=1)
+        draw.line((20,20,20,140),fill='black',width=1)
+        for index,x in enumerate((40,70,100,130,160)):
+            y=120-index*15
+            draw.ellipse((x-4,y-4,x+4,y+4),fill='black')
+        image.save(self.source)
+        self.interpretation={'unsupported':True,'reason':'no legend and I am unsure',
+                             'series':[]}
+        with patch('chart_harness.cli.make_provider',side_effect=self.provider):
+            result=run(self.args('declined'))
+        self.assertEqual('review_required',result['status'])
+        self.assertEqual([{'code':'reader_declined_the_page','reason':'no legend and I am unsure',
+                           'carried_on':'marks measured on the pixels, reported without axis values'}],
+                         result['diagnostics'])
+        self.assertTrue(result['points'],'the printed ring is still on the page')
+        for point in result['points']:
+            self.assertIsNone(point['x'],'no reading means no axis values are invented')
+            self.assertIsNotNone(point['pixel_x'])
+
+    def test_a_loose_tick_fit_holds_the_run_to_review_instead_of_ending_it(self):
+        """Anchors off one line make a scan hard to trust, not impossible to read."""
+        self.interpretation['y_axis']={'scale':'log','unit':'ug/mL','anchors':[
+            {'pixel':10,'value':1000},{'pixel':40,'value':30},{'pixel':150,'value':1}]}
+        with patch('chart_harness.cli.make_provider',side_effect=self.provider):
+            result=run(self.args('loose'))
+        self.assertEqual('review_required',result['status'])
+        loose=[d for d in result['diagnostics'] if d['code']=='axis_anchors_do_not_sit_on_one_line']
+        self.assertTrue(loose)
+        self.assertTrue(any('closest tick spacing' in c for c in loose[0]['detail']))
+
     def test_unrefined_model_coordinates_cannot_be_auto_exported(self):
         self.interpretation['series'][0]['marker']='point'
         with patch('chart_harness.cli.make_provider',side_effect=self.provider):

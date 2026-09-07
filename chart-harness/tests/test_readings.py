@@ -73,9 +73,13 @@ class RaceTests(unittest.TestCase):
         self.assertEqual(kept['reasoning_effort'], 'low')
         self.assertTrue(any('found something' in s for s in said))
 
-    def test_no_sound_reading_is_an_error(self):
-        with self.assertRaises(ValueError):
-            race({'low': RuntimeError('nope'), 'high': RuntimeError('nope')})
+    def test_no_sound_reading_carries_on_without_one_instead_of_failing(self):
+        """Losing every reader loses the reading, not the page."""
+        kept, _, said = race({'low': RuntimeError('nope'), 'high': RuntimeError('nope')})
+        self.assertTrue(kept['unsupported'])
+        self.assertEqual([], kept['series'])
+        self.assertIn('nope', kept['reason'])
+        self.assertTrue(any('going on without one' in s for s in said))
 
 
 class EffortTests(unittest.TestCase):

@@ -151,7 +151,14 @@ def race_readings(efforts,readers,read,size,label):
      names=', '.join(str(s.get('label',s['id'])) for s in reading.get('series',[])[:6]) or 'none named'),
      source=label)
  if not readings:
-  raise ValueError('no reading survived validation: '+json.dumps(failures))
+  # Every reading came back unusable. The page is still a page: the run goes on
+  # without a reading, on what the finders can measure in the pixels, and says
+  # plainly that no reader stood behind it.
+  progress.say('no reading survived validation ({f}); going on without one, on the '
+    'marks the pixels themselves support'.format(
+      f='; '.join(f'{e}: {m}' for e,m in failures.items())),source=label)
+  return {'unsupported':True,'reason':'no reading survived validation: '+json.dumps(failures),
+          'reading_failures':failures,'series':[]}
  counts={e:len(r.get('series',[])) for e,r in readings.items()}
  if len(set(counts.values()))>1:
   progress.say('the depths disagree on how many series are on the page ('
@@ -230,7 +237,19 @@ def run(args):
    skipped.append(name)
    progress.emit('stage',stage=name,state='skipped',reason='run time budget spent')
    return default
-  return stage(name,fn)
+  try:
+   return stage(name,fn)
+  except Exception as error:
+   # A call cut off by the run's own clock is time running out, not the figure
+   # being unreadable: the stage is recorded as unfinished and everything the
+   # pixels already supported is kept rather than thrown away with the run.
+   if not over_budget():raise
+   skipped.append(name)
+   progress.emit('stage',stage=name,state='skipped',
+     reason='the run clock ran out during the call: '+str(error))
+   progress.say('the clock ran out during {n}; keeping what the pixels already '
+     'supported and marking the rest unreviewed'.format(n=name))
+   return default
  state_lock=threading.Lock()
  def stage(name,fn):
   p=out/(name+'.json')
@@ -337,7 +356,15 @@ def run(args):
      efforts,readers,read_figure,size,provider_label(config)))
   else:
    interpretation=stage('interpretation',lambda:read_figure())
-  validate_interpretation(interpretation,size)
+  try:
+   validate_interpretation(interpretation,size)
+  except Exception as error:
+   # An unusable reading loses the reading, not the page: the run carries on on
+   # the pixels and records what the reader got wrong.
+   progress.say('the reading came back unusable ({e}); going on without it, on the '
+     'marks the pixels themselves support'.format(e=error),source=provider_label(config))
+   interpretation={'unsupported':True,'reason':'reading failed validation: '+str(error),
+                   'series':[]}
   interpretation['overlay_label']=provider_label(config)
   # What the reader says it sees, in its own words, so a watcher can tell a slow
   # call from a wrong reading before any coordinate is proposed.
@@ -423,8 +450,42 @@ def run(args):
    if series.get('marker')=='ring':series['coarse_ring_search']=config.get('coarse_ring_search',True)
    if series.get('marker')=='template':
     series['match_threshold']=max(series.get('match_threshold',0.72),config.get('min_template_score',0.6))
+  # A reader declining the page is an opinion about the page, not the end of it.
+  # The ink is still printed, so the finders measure it and every mark they can
+  # stand behind is reported in pixels, carrying the reader's objection with it,
+  # for a person to attribute rather than for the run to abandon.
   if interpretation.get('unsupported'):
-   result={'status':'unsupported','reason':interpretation.get('reason'),'points':[]}
+   if looker is not None:looker.join()
+   box=early_bank.get('plot_bbox') or [0,0,size[0],size[1]]
+   bank=early_bank.get('bank') or detectors.run_all(out/'working.png',box,
+     outdir=out/'legend'/'mined',methods=config.get('detection_methods'))
+   pooled=bank['pooled']
+   # More than one finder standing behind a mark is the strongest thing the page
+   # can say on its own; only where nothing is corroborated does a single finder
+   # carry a mark, and the reading says which held it up.
+   held=[m for m in pooled if m.get('method_count',1)>1] or pooled
+   reason=interpretation.get('reason') or 'the reader gave no reason'
+   progress.say('the reader declined this page ({r}); going on with the {n} mark(s) '
+     'the finders can stand behind, in pixels, for a person to attribute'.format(
+       r=reason,n=len(held)))
+   progress.emit('detected_marks',count=len(held),counts_by_method=bank['counts'],
+     corroborated=bank['corroborated'],plot_bbox=box,
+     marks=[{k:m[k] for k in ('x','y','found_by','method_count','width')} for m in held[:400]],
+     reason='reader declined the page; marks located by the finders alone')
+   points=[{'candidate_id':'mark_%03d'%i,'series':None,'series_label':None,
+            'x':None,'y':None,'pixel_x':m['x'],'pixel_y':m['y'],
+            'found_by':m['found_by'],'method_count':m.get('method_count',1),
+            'role':'unattributed'} for i,m in enumerate(held)]
+   progress.emit('candidates',count=len(points),candidates=points,
+     reason='located on the pixels without a reading; no axis values available')
+   result={'status':'review_required','reason':reason,'points':points,
+     'counts':{'observed':0,'unattributed':len(points)},
+     'plot_bbox':box,'detected_marks':{'count':len(pooled),'held':len(held),
+       'counts_by_method':bank['counts'],'corroborated':bank['corroborated']},
+     'diagnostics':[{'code':'reader_declined_the_page','reason':reason,
+       'carried_on':'marks measured on the pixels, reported without axis values'}],
+     'time_budget':{'seconds':budget,'spent':round(time.monotonic()-start,1),
+                    'stages_skipped':skipped}}
    write_json(out/'result.json',result);return result
   # No legend column, or a legend of words only. The marks are still printed and
   # they are thicker than every line on the sheet, so Python measures where they
@@ -477,10 +538,13 @@ def run(args):
   # A proposal is only meaningful as a reading of the figure, so it is reported in
   # the figure's own units and against the group it was attributed to; the pixels
   # stay alongside because they are what the screen re-measures.
-  axes={}
+  axes={};loose=[]
   for name in ('x_axis','y_axis'):
-   try:axes[name]=geometry.Axis(interpretation.get(name),name)
+   try:
+    axes[name]=geometry.Axis(interpretation.get(name),name)
+    loose+=axes[name].loose_fits
    except Exception:axes[name]=None
+  for complaint in loose:progress.say('the printed ticks do not sit on one line: '+complaint)
   labels={s['id']:s.get('label',s['id']) for s in interpretation.get('series',[])}
   def reading(c):
    sid=c.get('series_id') or (c.get('possible_series') or [None])[0]
@@ -521,9 +585,11 @@ def run(args):
   # then a few candidates per crop of the original pixels, each call bounded.
   labels=[s['label'] for s in interpretation['series']]
   detected=(interpretation.get('axis_tick_check') or {}).get('detected') or {}
-  axes_review=stage('review_axes',lambda:reviewer.complete('review_axes',
+  axes_review=unless_out_of_time('review_axes',
+    lambda:reviewer.complete('review_axes',
        review_axes_prompt(labels,context,detected),images=[out/'working.png']+references,
-       schema=REVIEW_AXES_SCHEMA))
+       schema=REVIEW_AXES_SCHEMA),
+    {'status':'unread','reason':'run time budget spent','missing_points':[]})
   if detected and isinstance(axes_review.get('axis_check'),dict):
    axis_check,dropped=axis_detect.resolve_tick_indices(axes_review['axis_check'],detected,
      config.get('axis_tick_tolerance_px'))
@@ -646,6 +712,9 @@ def run(args):
   if unresolved or review.get('missing_points') or review.get('status')!='accepted':
    result['status']='review_required'
   result['unresolved_regions']=unresolved
+  if loose:
+   result['status']='review_required'
+   result.setdefault('diagnostics',[]).append({'code':'axis_anchors_do_not_sit_on_one_line','detail':loose})
   if 'axis_tick_check' in interpretation:result['axis_tick_check']=interpretation['axis_tick_check']
   result['model_mode']=config.get('mode',config.get('model',{}).get('mode','api'))
   result['source_sha256']=hashlib.sha256(source.read_bytes()).hexdigest()

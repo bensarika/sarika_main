@@ -1,7 +1,7 @@
 """Short, versioned contracts. No document-sized conversational history."""
 import json
 
-VERSION = 'legend-glyph-screened-1'
+VERSION = 'legend-glyph-screened-2-no-declining'
 INTERPRET_SCHEMA = {
  'type':'object','required':['plot_bbox','x_axis','y_axis','series'],
  'properties':{
@@ -36,6 +36,12 @@ values at equal spacing uses linear mapping of those displayed numbers.
 Explicit axis breaks can use segments:[{{pixel_min,pixel_max,anchors:[...]}}].
 Categorical, polar, pie, perspective-skewed, and otherwise unsupported axes:
 set unsupported=true and explain; do not force a Cartesian mapping.
+unsupported=true is only for an axis geometry that has no Cartesian reading at
+all. It is never an answer to a hard page. A missing legend, unlabelled groups,
+rotated or cramped text, a poor scan, overlapping marks, or your own uncertainty
+are all pages you must still read: give your best reading, put what you could not
+settle in unresolved_regions and notes, and lower your confidence. Answering with
+nothing is worse than answering with a reading a person can correct.
 
 List series in the order their entries appear in the legend, top to bottom (or
 left to right for a horizontal legend); Python cuts each legend glyph out of the
@@ -55,7 +61,12 @@ those samples as observations. A figure may plot one measured curve surrounded b
 a confidence band or error bars; the band edges are not observations, and the
 source context usually says how many curves and how many sample times exist.
 Read the caption and body text supplied below for the sampling times and the
-number of curves before proposing marks. If the text states sample times, list
+number of curves before proposing marks. Sampling schedules are conventional:
+hours usually fall on multiples of 24 (24, 48, 72...), days on weekly multiples
+after the first week or two, longer studies on months. Say in notes which family
+this figure looks like and use it to decide where to LOOK for a mark you may have
+missed. It is a search hint only: report a mark solely where you can see ink at
+that place, never because the schedule says one belongs there. If the text states sample times, list
 them in sample_times using the x-axis unit. For each series give one tight template bbox around
 a clean marker body (exclude legend line/text), and approximate center seeds for
 visible observations if practical. Python will refine these seeds locally. The

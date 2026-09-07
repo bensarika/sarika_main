@@ -80,6 +80,7 @@ class Axis:
             raise ValueError(f"{name}.allow_extrapolation must be boolean")
         self.segments = []
         self.fit_diagnostics = []
+        self.loose_fits = []
         segments = definition.get("segments")
         if segments is not None and (not isinstance(segments, list) or not segments):
             raise ValueError(f"{name}.segments must be a nonempty list")
@@ -114,8 +115,12 @@ class Axis:
             max_residual = float(np.max(residual_pixels))
             gap = float(np.min(np.diff(pixels)))
             limit = gap * CALIBRATION_RESIDUAL_FRACTION_OF_TICK_GAP
+            # Anchors read off a scan rarely sit on one perfect line. A loose fit
+            # is a fact about how well this page can be measured, not a reason to
+            # throw the page away: it is recorded, travels with every value read
+            # through this axis, and holds the run to review rather than export.
             if max_residual > limit + 1e-9:
-                raise ValueError(
+                self.loose_fits.append(
                     f"{name} tick calibration residual {max_residual:.3g} px is "
                     f"{max_residual / gap:.1%} of the closest tick spacing "
                     f"({gap:.3g} px); the anchors do not sit on one scale")

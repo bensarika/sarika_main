@@ -245,14 +245,20 @@ class GeometryTests(unittest.TestCase):
         self.assertIsNone(axis.value(-1))
         self.assertEqual(axis.value(80), 22.)
 
-    def test_tick_fit_rejects_inconsistent_linear_and_log_scales(self):
+    def test_tick_fit_reports_inconsistent_linear_and_log_scales_without_losing_the_page(self):
+        """A scan whose anchors miss one line is measurable but not trustworthy."""
         for scale, values in (("linear", [0, 10, 100]), ("log", [1, 10, 1000])):
             with self.subTest(scale=scale):
                 definition = {"scale": scale, "anchors": [
                     {"pixel": p, "value": v} for p, v in zip((0, 50, 100), values)],
                     "calibration_pixel_tolerance": 100, "axis_tolerance_fraction": 1}
-                with self.assertRaisesRegex(ValueError, "of the closest tick spacing"):
-                    Axis(definition, "bad_ticks")
+                axis = Axis(definition, "bad_ticks")
+                self.assertTrue(any("of the closest tick spacing" in c for c in axis.loose_fits))
+
+    def test_ticks_on_one_line_raise_no_complaint(self):
+        axis = Axis({"scale": "linear", "anchors": [
+            {"pixel": p, "value": p / 10} for p in (0, 50, 100)]}, "clean")
+        self.assertEqual([], axis.loose_fits)
 
     def test_noisy_ticks_fit_one_scale_instead_of_warping_between_ticks(self):
         linear = Axis({"scale": "linear", "anchors": [
