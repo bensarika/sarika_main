@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     os.environ["PS_DATABASE_URL"] = f"sqlite:///{tmp_path / 'test.db'}"
     os.environ["PS_DATA_DIR"] = str(tmp_path / "data")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)  # tests opt in to provider keys explicitly
     # settings/db are module globals; re-import fresh for each test.
     import importlib
 
@@ -27,14 +28,19 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
 
     importlib.reload(sess)
     import protocol_studio.api.admin as ad
+    import protocol_studio.api.ai as ai
+    import protocol_studio.api.collab as co
     import protocol_studio.api.library as lib
+    import protocol_studio.api.providers as pv
+    import protocol_studio.api.trial_lab as tl
     import protocol_studio.api.versions as vs
     import protocol_studio.api.works as ws
     import protocol_studio.auth.routes as ar
     import protocol_studio.engine.export as ex
+    import protocol_studio.llm.gateway as gw
     import protocol_studio.main as main
 
-    for m in (ar, ex, ws, vs, ad, lib, main):
+    for m in (ar, ex, ws, vs, ad, lib, gw, co, tl, ai, pv, main):
         importlib.reload(m)
     with TestClient(main.app) as c:
         yield c

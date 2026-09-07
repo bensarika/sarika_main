@@ -177,6 +177,43 @@ class AccessRequest(Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class ProviderConfig(Base):
+    """Admin-managed model provider: enabled flag, default model, encrypted API key (see llm/keys.py).
+
+    The key column holds a Fernet token, never the plaintext; the API only ever
+    reports whether a key is present and its last four characters.
+    """
+
+    __tablename__ = "provider_configs"
+    provider: Mapped[str] = mapped_column(String(32), primary_key=True)  # openai | grok | muse | ...
+    enabled: Mapped[bool] = mapped_column(default=False)
+    model: Mapped[str] = mapped_column(String(80), default="")
+    base_url: Mapped[str] = mapped_column(String(200), default="")
+    api_key_enc: Mapped[str] = mapped_column(Text, default="")
+    key_hint: Mapped[str] = mapped_column(String(8), default="")
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AiCall(Base):
+    """One model call: who, on which work, for what purpose, tokens and latency. Never stores prompt text."""
+
+    __tablename__ = "ai_calls"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    work_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str] = mapped_column(String(80))
+    purpose: Mapped[str] = mapped_column(String(32))  # revise | ask | adapt | ...
+    data_class: Mapped[str] = mapped_column(String(16), default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(16), default="ok")  # ok | error | blocked
+    error: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
 class ProviderPolicy(Base):
     """Which model provider may receive which data class. Absent row = not approved (fail closed)."""
 

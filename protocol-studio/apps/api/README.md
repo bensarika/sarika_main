@@ -19,7 +19,7 @@ env vars for real Google Sign-In (Internal audience, `@sarika.com` only).
 | --- | --- |
 | `main.py` | App factory: lifespan (DB init), session + CORS middleware, routers, `/healthz`, optional static serving of `apps/web/dist`. |
 | `settings.py` | `Settings` (pydantic-settings, `PS_` prefix). DB URL, data dir, secret key, auth mode, admin allowlist, Google client, CORS. |
-| `db.py` | SQLAlchemy 2 ORM: `User`, `Work` (+ study code, phase, drugs, status, data class), `Permission`, `Draft` (one mutable head per work), `Revision` (append-only command log), `Version` (immutable freeze), `Adjudication`, `AuditEvent`, `Comment`, `Presence`, `AccessRequest`, `ProviderPolicy`, `SourceRecord`. SQLite by default with FK enforcement; Postgres by URL. |
+| `db.py` | SQLAlchemy 2 ORM: `User`, `Work` (+ study code, phase, drugs, status, data class), `Permission`, `Draft` (one mutable head per work), `Revision` (append-only command log), `Version` (immutable freeze), `Adjudication`, `AuditEvent`, `Comment`, `Presence`, `AccessRequest`, `ProviderConfig` (encrypted key), `ProviderPolicy`, `AiCall` (usage, no prompt text), `SourceRecord`. SQLite by default with FK enforcement; Postgres by URL. |
 | `library.py` | Starters: `blank`, `template:ad-antibody-p2b` (rich synthetic AD antibody protocol, see `starters/`) and `example:<id>` (from `reference/protocol_examples.json`). Claims are bound on creation. |
 | `starters/ad_antibody.py` | The synthetic starter: full model + narrative blocks with claims across all 14 sections. Explicitly illustrative, never a real protocol. |
 | `engine/state.py` | `DraftState` = model + narrative `Block`s (+ `Claim`s, pending `Proposal`) + not-applicable declarations + `Adaptation` + typed `key_inputs` + revision; `refresh_claims()`. |
@@ -38,6 +38,12 @@ env vars for real Google Sign-In (Internal audience, `@sarika.com` only).
 | `api/trial_lab.py` | `/api/trial-lab/sample-size`, `/profiles`, `/explore` over `packages/stats`. |
 | `api/admin.py` | Users (invite/activate/role), audit log, usage per period (`/usage`, `/usage.csv`), pending access requests across works. The primary admin cannot be demoted. |
 | `api/library.py` | Starters, outline, rule catalogue (with implemented/planned status), JSON schema. |
+| `api/ai.py` | `GET …/ai/status`, `POST …/ai/revise` (→ pending `propose_text`, origin `ai`), `POST …/ai/ask` (advisory answer). |
+| `api/providers.py` | Admin › Models: provider list (never returns keys), put config/key, per-data-class policy, connectivity test, `/ai-usage`. |
+| `llm/keys.py` | Fernet encryption of provider keys at rest, derived from `PS_SECRET_KEY`; 4-char hint only. |
+| `llm/providers.py` | `ProviderSpec` registry (OpenAI `gpt-6-astra` via the Responses API today; Grok/Muse/… are one adapter each) and the `Provider` protocol. |
+| `llm/gateway.py` | The single door to any model: resolve config → **fail-closed data-class policy** → call → `AiCall` record. |
+| `llm/prompts.py` | Deterministic prompt builders; a revise prompt carries only the selected block + its claim-bound facts. |
 
 ## Edit/commit contract
 
@@ -87,6 +93,25 @@ needs accept/reject. Viewers may comment and suggest; resolving needs edit
 access or authorship. Access requests bypass the work ACL by design and are
 decided by a work admin, which writes the `Permission` row.
 
+## Model reasoning (LLM gateway)
+
+On-demand only, at the user's request, and always as a proposal: `POST
+/api/works/{id}/ai/revise {block_id, instruction, base_revision}` sends one
+block and its bound facts to the configured provider, then records the reply
+as a pending `propose_text` (origin `ai`, `proposed_by` = `provider:model`)
+with the same deterministic factual-change checks a human suggestion gets. The
+live text does not change until an editor accepts. `…/ai/ask` answers a
+question about a section and is marked `advisory`.
+
+Policy is fail-closed per work `data_class`: only `public` is allowed by
+default; an administrator approves a provider for `internal`, `confidential`
+or `restricted` in Admin › Models (`PUT /api/admin/providers/{id}/policy`).
+A blocked request returns `403` before anything leaves the server and is
+still counted (`status=blocked`) in `/api/admin/ai-usage`. Provider keys are
+entered in Admin, stored Fernet-encrypted, and never returned by any route;
+the `OPENAI_API_KEY` environment variable is a fallback when no key is stored.
+A provider must be **enabled** by an admin even if a key exists.
+
 ## Tests
 
 Temp SQLite per test, dev auth. `test_api.py`: auth/ACL, stale-command 409,
@@ -96,6 +121,9 @@ DOCX/LaTeX export, admin usage/audit. `test_authoring.py`: synthetic starter,
 adaptation classification, key inputs, factual-change detection, text
 proposals, Trial Lab. `test_collab.py`: comment threads, suggestion → proposal,
 presence, access-request flow, version diff/restore, usage periods + CSV.
+`test_ai.py`: key encryption, Responses parsing, provider admin surface (no key
+leakage), fail-closed policy, revise → pending proposal with factual checks,
+ask, provider errors, viewer denial. The upstream call is faked.
 
 ```
 uv run pytest apps/api

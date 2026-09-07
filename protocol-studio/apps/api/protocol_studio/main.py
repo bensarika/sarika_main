@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from protocol_studio.api import admin, collab, library, trial_lab, versions, works
+from protocol_studio.api import admin, ai, collab, library, providers, trial_lab, versions, works
 from protocol_studio.auth import routes as auth_routes
 from protocol_studio.db import init_db
 from protocol_studio.settings import settings
@@ -55,6 +55,8 @@ def create_app() -> FastAPI:
     app.include_router(library.router)
     app.include_router(trial_lab.router)
     app.include_router(collab.router)
+    app.include_router(ai.router)
+    app.include_router(providers.router)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
