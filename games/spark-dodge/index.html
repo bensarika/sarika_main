@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Spark Dodge</title>
+<title>SARIKA PONG</title>
 <link rel="icon" href="data:," />
 <style>
   :root { color-scheme: dark; }
@@ -21,7 +21,17 @@
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   h1 { margin: 0; font-size: 26px; letter-spacing: 2px; font-weight: 600; }
-  #hud { display: flex; gap: 24px; font-variant-numeric: tabular-nums; font-size: 15px; opacity: .85; }
+  #hud {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 24px;
+    max-width: 96vw;
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    opacity: .85;
+  }
+  #who { max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; display: inline-block; }
   canvas {
     background: #0d1117;
     border: 1px solid #2b3442;
@@ -31,11 +41,24 @@
     height: auto;
   }
   #hint { font-size: 13px; opacity: .6; }
+  #name {
+    background: #0d1117;
+    border: 1px solid #2b3442;
+    border-radius: 8px;
+    color: inherit;
+    font: inherit;
+    font-size: 15px;
+    padding: 6px 10px;
+    width: 220px;
+    max-width: 60vw;
+  }
+  #name:focus { outline: none; border-color: #7fd1ff; }
 </style>
 </head>
 <body>
-  <h1>SPARK DODGE</h1>
-  <div id="hud"><span>Score: <b id="score">0</b></span><span>Best: <b id="best">0</b></span></div>
+  <h1>SARIKA PONG</h1>
+  <input id="name" type="text" maxlength="16" placeholder="Enter your name" autocomplete="off" />
+  <div id="hud"><span>Player: <b id="who">Guest</b></span><span>Score: <b id="score">0</b></span><span>Best: <b id="best">0</b></span></div>
   <canvas id="game" width="480" height="640"></canvas>
   <div id="hint">Move with the mouse, touch, or arrow keys. Dodge the red sparks, collect the green orbs.</div>
 
@@ -45,9 +68,24 @@ const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
+const nameEl = document.getElementById('name');
+const whoEl = document.getElementById('who');
 
 let best = Number(localStorage.getItem('sparkDodgeBest') || 0);
 bestEl.textContent = best;
+
+let playerName = localStorage.getItem('sparkPongName') || '';
+nameEl.value = playerName;
+whoEl.textContent = playerName || 'Guest';
+nameEl.addEventListener('input', () => {
+  playerName = nameEl.value.trim();
+  whoEl.textContent = playerName || 'Guest';
+  localStorage.setItem('sparkPongName', playerName);
+});
+nameEl.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter') nameEl.blur();
+});
 
 const player = { x: W / 2, y: H - 60, r: 12, vx: 0 };
 let sparks = [], orbs = [], score = 0, tick = 0, over = false;
@@ -58,7 +96,10 @@ function reset() {
   player.x = W / 2; player.vx = 0;
 }
 
+const typing = () => document.activeElement === nameEl;
+
 addEventListener('keydown', e => {
+  if (typing()) return;
   keys.add(e.key);
   if (over && (e.key === ' ' || e.key === 'Enter')) reset();
   if (e.key.startsWith('Arrow')) e.preventDefault();
@@ -147,7 +188,7 @@ function draw() {
     ctx.font = '600 30px system-ui, sans-serif';
     ctx.fillText('GAME OVER', W / 2, H / 2 - 14);
     ctx.font = '16px system-ui, sans-serif';
-    ctx.fillText('Score ' + score + '  ·  Best ' + best, W / 2, H / 2 + 16);
+    ctx.fillText((playerName || 'Guest') + '  ·  Score ' + score + '  ·  Best ' + best, W / 2, H / 2 + 16);
     ctx.fillText('Click or press Space to play again', W / 2, H / 2 + 46);
   }
 }
