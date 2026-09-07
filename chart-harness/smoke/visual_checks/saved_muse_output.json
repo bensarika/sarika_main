@@ -1,0 +1,131 @@
+{
+  "annotations": [
+    {
+      "id": "p0001",
+      "label": "topmost open circle on y-axis, ring clipped by axis",
+      "status": "unresolved"
+    },
+    {
+      "id": "p0002",
+      "label": "open circle selection just below top, early time",
+      "status": "observed"
+    },
+    {
+      "id": "p0003",
+      "label": "open circle selection at early decline",
+      "status": "observed"
+    },
+    {
+      "id": "p0004",
+      "label": "open circle selection below predicted line",
+      "status": "observed"
+    },
+    {
+      "id": "p0005",
+      "label": "open circle selection above predicted line",
+      "status": "observed"
+    },
+    {
+      "id": "p0006",
+      "label": "open circle selection mid time",
+      "status": "observed"
+    },
+    {
+      "id": "p0007",
+      "label": "open circle selection near 10 days",
+      "status": "observed"
+    },
+    {
+      "id": "p0008",
+      "label": "open circle selection above line mid time",
+      "status": "observed"
+    },
+    {
+      "id": "p0009",
+      "label": "open circle selection above line",
+      "status": "observed"
+    },
+    {
+      "id": "p0010",
+      "label": "open circle selection at ~21 days",
+      "status": "observed"
+    },
+    {
+      "id": "p0011",
+      "label": "open circle selection at ~28 days",
+      "status": "observed"
+    },
+    {
+      "id": "p0012",
+      "label": "open circle selection at ~35 days",
+      "status": "observed"
+    }
+  ],
+  "assessment": "consistent",
+  "notes": [],
+  "image_path": "/Users/benjamin/Documents/Codex/2026-09-06/ise/work/chart_harness_revised/smoke/visual_checks/saved_muse_output.png",
+  "source_sha256": "7ca84fa0a3576018d5cdeef81672c332a806ac38689087872794347859d4480b",
+  "anchors": [
+    {
+      "id": "p0001",
+      "x": 266.0,
+      "y": 422.0
+    },
+    {
+      "id": "p0002",
+      "x": 300.4617772293902,
+      "y": 513.0962541072777
+    },
+    {
+      "id": "p0003",
+      "x": 345.5972804233928,
+      "y": 578.4982101717832
+    },
+    {
+      "id": "p0004",
+      "x": 369.8417858115563,
+      "y": 671.2218772734246
+    },
+    {
+      "id": "p0005",
+      "x": 423.96715513551237,
+      "y": 654.3684762202336
+    },
+    {
+      "id": "p0006",
+      "x": 478.0777085342025,
+      "y": 728.2645087678629
+    },
+    {
+      "id": "p0007",
+      "x": 560.4319777363188,
+      "y": 740.0511415104527
+    },
+    {
+      "id": "p0008",
+      "x": 668.036484525809,
+      "y": 710.9584924053925
+    },
+    {
+      "id": "p0009",
+      "x": 749.7752071893024,
+      "y": 742.4043857197253
+    },
+    {
+      "id": "p0010",
+      "x": 857.6899200384236,
+      "y": 834.0048808621988
+    },
+    {
+      "id": "p0011",
+      "x": 1047.183894231119,
+      "y": 878.248426537467
+    },
+    {
+      "id": "p0012",
+      "x": 1234.517060463552,
+      "y": 919.6951032059576
+    }
+  ],
+  "same_provider": true
+}
