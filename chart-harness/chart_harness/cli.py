@@ -32,6 +32,7 @@ from .review_validation import CENTER_FRACTION_OF_MARK,enforce_marker_centers
 from . import review_batches
 from . import markers
 from . import marker_screen
+from . import on_line
 from . import progress
 
 def write_json(path,data):
@@ -707,6 +708,55 @@ def run(args):
      series={k:{'kept':v['kept'],'expected':v['expected'],'missing':v['missing'],
                 'step_px':v['step_px'],'label':v['label']} for k,v in spacing_report.items()},
      predicted=[h['predicted'][0] for e in spacing_report.values() for h in e['holes']][:200])
+  # A mark is printed on its curve and every curve is sampled, so the page can
+  # answer two questions about the kept marks on its own: does each one stand on
+  # a drawn stroke, and did any curve come away with nothing? Both are measured
+  # against the figure's own pen and mark width, and both hold the run to review
+  # rather than adding or moving a point.
+  if config.get('check_marks_sit_on_their_curve',True) and result.get('rows'):
+   kept=[r for r in result['rows'] if r.get('status')=='observed']
+   width=(bank or {}).get('mark_width_px') if bank else None
+   curve_report=on_line.check(out/'working.png',interpretation['plot_bbox'],kept,mark_width=width)
+   if curve_report.get('available'):
+    tolerance=on_line.column_tolerance(kept,width)
+    sampling=on_line.columns(kept,tolerance)
+    expected=[s['id'] for s in interpretation.get('series',[])]
+    holes=on_line.gaps_in_columns(sampling,expected)
+    crossed=on_line.crossings(sampling)
+    doubled=[{'column':c['column'],'pixel_x':c['pixel_x'],'series':c['doubled']}
+             for c in sampling if c['doubled']]
+    result['curve_check']={
+      'off_curve':curve_report['off_curve'],'points':curve_report['points'],
+      'curves':curve_report['curves'],'unsampled_curves':curve_report['unsampled_curves'],
+      'tolerance_px':curve_report['tolerance_px'],'stroke_px':curve_report['stroke_px'],
+      'basis':curve_report['basis']}
+    result['sampling_columns']={
+      'tolerance_px':tolerance,
+      'columns':[{'column':c['column'],'pixel_x':c['pixel_x'],
+                  'series_order':c['series_order'],'doubled':c['doubled']} for c in sampling],
+      'series_missing_from_a_column':holes,'crossing_series':crossed,
+      'doubled_in_a_column':doubled,
+      'basis':'the marks stand in the columns of the sampling times they share'}
+    trouble=[]
+    if curve_report['off_curve']:trouble.append({'code':'kept_marks_sit_off_every_curve',
+      'count':curve_report['off_curve'],
+      'candidates':[m['candidate_id'] for m in curve_report['points'] if m.get('on_curve') is False]})
+    if curve_report['unsampled_curves']:trouble.append({'code':'a_drawn_curve_carries_no_mark',
+      'count':len(curve_report['unsampled_curves']),'curves':curve_report['unsampled_curves'][:12]})
+    if doubled:trouble.append({'code':'one_series_twice_at_one_sampling_time','columns':doubled})
+    if holes:trouble.append({'code':'series_absent_from_a_column_its_neighbours_appear_in',
+      'holes':holes[:40],
+      'note':'where no curves cross, the order of the others brackets where to look'})
+    if trouble:
+     result['status']='review_required'
+     result.setdefault('diagnostics',[]).extend(trouble)
+    progress.say(on_line.advice(curve_report) or 'every kept mark stands on a drawn curve and '
+      'every curve carries marks')
+    progress.emit('curve_check',off_curve=curve_report['off_curve'],
+      curves=len(curve_report['curves']),
+      unsampled=[c['bbox'] for c in curve_report['unsampled_curves']][:20],
+      columns=len(sampling),missing_in_columns=len(holes),crossing_series=crossed,
+      tolerance_px=curve_report['tolerance_px'])
   # Entire-job completeness is stricter than candidate precision.
   unresolved=interpretation.get('unresolved_regions',[])
   if unresolved or review.get('missing_points') or review.get('status')!='accepted':
