@@ -157,8 +157,16 @@ def race_readings(efforts,readers,read,size,label):
   progress.say('the depths disagree on how many series are on the page ('
     +', '.join(f'{e}: {n}' for e,n in counts.items())+'); keeping the deepest and '
     'letting the pixel screen settle it',source=label)
- # efforts are listed shallowest-first, so the last one still standing is the deepest.
- kept=[e for e in efforts if e in readings][-1]
+ # efforts are listed shallowest-first, so the last one still standing is the
+ # deepest. A reading that names no series ends the run with nothing, so a
+ # reading that did find series is preferred over a deeper one that gave up.
+ standing=[e for e in efforts if e in readings]
+ named=[e for e in standing if readings[e].get('series')]
+ if named and len(named)<len(standing):
+  progress.say('the {g}-reasoning reading gave up on the page while the {k}-reasoning one '
+    'named series; building on the reading that found something'.format(
+      g=', '.join(e for e in standing if e not in named),k=named[-1]),source=label)
+ kept=(named or standing)[-1]
  progress.say(f'building the run on the {kept}-reasoning reading',source=label)
  out=dict(readings[kept])
  out['reasoning_effort']=kept
@@ -172,7 +180,16 @@ def validate_interpretation(d,size):
  box=d.get('plot_bbox')
  if not isinstance(box,list) or len(box)!=4 or not all(isinstance(x,(int,float)) and math.isfinite(x) for x in box):
   raise ValueError('plot_bbox needs four finite numbers')
- if not(0<=box[0]<box[2]<=w and 0<=box[1]<box[3]<=h):raise ValueError('plot_bbox out of frame')
+ # A reader that puts the plot's edge a little past the paper has still read the
+ # plot. The box is held to the image it describes, and only one that keeps no
+ # area inside it is refused; the ticks measured downstream settle where the
+ # frame really is.
+ held=[min(max(box[0],0),w),min(max(box[1],0),h),min(max(box[2],0),w),min(max(box[3],0),h)]
+ if not(held[0]<held[2] and held[1]<held[3]):raise ValueError('plot_bbox keeps no area inside the image')
+ if held!=[float(v) for v in box]:
+  progress.say('the reader put the plot frame past the page edge ({b}); held it to the image'.format(
+    b=','.join(str(round(v)) for v in box)))
+  d['plot_bbox']=held
  ids=set()
  for s in d.get('series',[]):
   if not isinstance(s.get('id'),str) or s['id'] in ids:raise ValueError('series IDs must be unique strings')
@@ -180,7 +197,13 @@ def validate_interpretation(d,size):
   if len(s.get('seeds',[]))>1000:raise ValueError('too many model seeds')
   for p in s.get('seeds',[]):
    if not all(isinstance(p.get(k),(int,float)) and math.isfinite(p[k]) for k in ('x','y')):raise ValueError('nonfinite seed')
-   if not(0<=p['x']<w and 0<=p['y']<h):raise ValueError('seed out of frame')
+  # A seed is only a place to look. One that falls off the page is dropped, and
+  # the rest of the reading stands; nothing is invented to replace it.
+  inside=[p for p in s.get('seeds',[]) if 0<=p['x']<w and 0<=p['y']<h]
+  if 'seeds' in s and len(inside)!=len(s['seeds']):
+   progress.say('{n} of the {t} places {sid} pointed at fall off the page; dropped them'.format(
+     n=len(s['seeds'])-len(inside),t=len(s['seeds']),sid=s['id']))
+   s['seeds']=inside
  if not ids:raise ValueError('No series supplied')
 
 def run(args):
@@ -683,11 +706,20 @@ def batch(args):
   else:page=None;native=source
   context=source_context(args,config,source)
   rotation=args.rotate
+  shown=[False]
   def read_layout(stage,clockwise):
    """Lay the page out at this rotation; the sheet itself may be printed sideways."""
    transform=orient(native,out/'oriented_page.png',clockwise)
    with Image.open(out/'oriented_page.png') as im:size=im.size
    view=crop_image(out/'oriented_page.png',[0,0,size[0],size[1]],out/'layout_view.png',max_side=2200)
+   if not shown[0]:
+    # The page goes on screen before anyone is asked about it: the watcher sees
+    # what was uploaded, upright, while the panel call is still open.
+    shown[0]=True
+    progress.emit('image',path=str(out/'oriented_page.png'),width=size[0],height=size[1],
+      page=page,rotation=clockwise)
+    progress.say('page is up ({w}x{h}px); asking which panels on it were requested'.format(
+      w=size[0],h=size[1]))
    with Image.open(out/'layout_view.png') as im:preview_size=im.size
    pw,ph=preview_size
    read=locator.complete(stage,f'''Identify distinct requested PK panels in this page ({pw}x{ph} pixels).
@@ -718,12 +750,26 @@ Return an empty panels list if the requested figure is absent. Source evidence:
   scale=np.array(preview['output_edges_to_source_edges'])
   def native_box(box):
    if len(box)!=4 or not all(isinstance(v,(int,float)) and math.isfinite(v) for v in box):raise ValueError('invalid panel box')
-   if not(0<=box[0]<box[2]<=pw and 0<=box[1]<box[3]<=ph):raise ValueError('panel box outside image')
+   # A reader's box that runs off the sheet is a reading of the page's edge, not a
+   # reason to abandon the page: it is trimmed to the paper and only a box that
+   # keeps no area at all is refused.
+   trimmed=[min(max(box[0],0),pw),min(max(box[1],0),ph),min(max(box[2],0),pw),min(max(box[3],0),ph)]
+   if trimmed!=list(box):
+    progress.say('the panel box ran off the sheet ({b}); trimmed it to the page'.format(
+      b=','.join(str(round(v)) for v in box)))
+   box=trimmed
+   if not(0<=box[0]<box[2]<=pw and 0<=box[1]<box[3]<=ph):raise ValueError('panel box keeps no area inside the image')
    a=scale@np.array([box[0],box[1],1]);b=scale@np.array([box[2],box[3],1])
    return [max(0,int(math.floor(a[0]))),max(0,int(math.floor(a[1]))),min(w,int(math.ceil(b[0]))),min(h,int(math.ceil(b[1])))]
   ref=None
-  if layout.get('legend_bbox'):
-   ref=out/'legend.png';crop_image(out/'oriented_page.png',native_box(layout['legend_bbox']),ref)
+  legend=layout.get('legend_bbox')
+  # A reader with no legend to point at sometimes answers with an empty box
+  # rather than nothing. That is a page without a legend, not a broken page.
+  if legend and not(len(legend)==4 and legend[0]<legend[2] and legend[1]<legend[3]):
+   progress.say('the reader returned an empty legend box; reading the page as having no legend')
+   legend=None
+  if legend:
+   ref=out/'legend.png';crop_image(out/'oriented_page.png',native_box(legend),ref)
   write_json(out/'layout.json',{'source':str(source),'page':page,'rotation':rotation,'layout':layout,'preview_transform':preview})
   results=[];used=set()
   for panel in layout['panels']:

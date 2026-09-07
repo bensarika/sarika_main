@@ -98,6 +98,42 @@ class CLITests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'different input/config'):
                 batch(args)
 
+    def test_a_panel_box_running_off_the_sheet_is_trimmed_not_abandoned(self):
+        """A box past the paper's edge still names a panel; the page is not thrown away."""
+        original = self.provider
+        def provider(config, out, role, not_after=None):
+            made = original(config, out, role, not_after)
+            inner = made.provider
+            complete = inner.complete
+            def wider(stage, prompt, images=(), schema=None):
+                if stage == 'layout':
+                    return {'panels': [{'id': 'one', 'label': 'one', 'crop_bbox': [50, 0, 4000, 4000]}]}
+                return complete(stage, prompt, images, schema)
+            inner.complete = wider
+            return made
+        with patch('chart_harness.cli.make_provider', side_effect=provider):
+            result = batch(self.args('trimmed'))
+        self.assertEqual(1, len(result['panels']))
+        self.assertEqual('review_required', result['status'])
+
+    def test_an_empty_legend_box_means_no_legend_not_a_dead_page(self):
+        """Readers answer 'no legend' with a zero-area box; the page still runs."""
+        original = self.provider
+        def provider(config, out, role, not_after=None):
+            made = original(config, out, role, not_after)
+            inner = made.provider
+            complete = inner.complete
+            def with_empty_legend(stage, prompt, images=(), schema=None):
+                if stage == 'layout':
+                    return {'panels': [{'id': 'one', 'label': 'one', 'crop_bbox': [0, 0, 200, 160]}],
+                            'legend_bbox': [0, 0, 0, 0]}
+                return complete(stage, prompt, images, schema)
+            inner.complete = with_empty_legend
+            return made
+        with patch('chart_harness.cli.make_provider', side_effect=provider):
+            result = batch(self.args('nolegend'))
+        self.assertEqual(1, len(result['panels']))
+
     def test_unrefined_model_coordinates_cannot_be_auto_exported(self):
         self.interpretation['series'][0]['marker']='point'
         with patch('chart_harness.cli.make_provider',side_effect=self.provider):

@@ -55,9 +55,23 @@ class RaceTests(unittest.TestCase):
         self.assertEqual(kept['reasoning_effort'], 'low')
         self.assertTrue(any('unusable' in s for s in said))
 
-    def test_an_unusable_reading_is_rejected_by_validation_not_kept(self):
-        kept, _, _ = race({'low': reading(2), 'high': reading(3, box=(0, 0, 500, 500))})
+    def test_a_frame_past_the_page_edge_is_held_to_the_page_not_thrown_away(self):
+        kept, _, said = race({'low': reading(2), 'high': reading(3, box=(0, 0, 500, 500))})
+        self.assertEqual(kept['reasoning_effort'], 'high')
+        self.assertEqual([0, 0, 100, 100], kept['plot_bbox'])
+        self.assertTrue(any('held it to the image' in s for s in said))
+
+    def test_a_reading_with_no_frame_on_the_page_is_rejected(self):
+        kept, _, _ = race({'low': reading(2), 'high': reading(3, box=(400, 400, 500, 500))})
         self.assertEqual(kept['reasoning_effort'], 'low')
+
+    def test_a_reading_that_found_series_beats_a_deeper_one_that_gave_up(self):
+        empty = reading(1)
+        empty['series'] = []
+        empty['unsupported'] = True
+        kept, _, said = race({'low': reading(2), 'high': empty})
+        self.assertEqual(kept['reasoning_effort'], 'low')
+        self.assertTrue(any('found something' in s for s in said))
 
     def test_no_sound_reading_is_an_error(self):
         with self.assertRaises(ValueError):
