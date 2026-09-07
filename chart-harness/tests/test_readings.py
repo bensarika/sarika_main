@@ -1,3 +1,5 @@
+import threading
+import time
 import unittest
 
 from chart_harness import progress
@@ -12,12 +14,14 @@ def reading(series, box=(10, 10, 90, 90)):
 class Reader:
     """Stands in for a provider: answers with whatever the depth was told to say."""
 
-    def __init__(self, answer):
+    def __init__(self, answer, takes=0.):
         self.answer = answer
+        self.takes = takes
         self.asked = 0
 
     def complete(self, *args, **kwargs):
         self.asked += 1
+        time.sleep(self.takes)
         if isinstance(self.answer, Exception):
             raise self.answer
         return self.answer
@@ -30,6 +34,42 @@ def race(answers, size=(100, 100)):
         kept = race_readings(list(answers), readers,
                              lambda effort, provider: provider.complete(), size, 'reader')
     return kept, readers, [e['text'] for e in said if e['kind'] == 'say']
+
+
+def race_slowly(readers, size=(100, 100)):
+    said = []
+    with progress.listening(said.append):
+        kept = race_readings(list(readers), readers,
+                             lambda effort, provider: provider.complete(), size, 'reader')
+    return kept, [e['text'] for e in said if e['kind'] == 'say']
+
+
+class Dawdles(Reader):
+    """A depth still thinking: it answers only once the test lets it go."""
+
+    def __init__(self, answer):
+        super().__init__(answer)
+        self.released = threading.Event()
+
+    def complete(self, *args, **kwargs):
+        self.asked += 1
+        self.released.wait(30)
+        return self.answer
+
+
+class PatienceTests(unittest.TestCase):
+    def test_a_depth_that_thinks_far_longer_than_the_first_is_not_waited_on(self):
+        dawdling = Dawdles(reading(3))
+        self.addCleanup(dawdling.released.set)
+        kept, said = race_slowly({'low': Reader(reading(1), takes=.02), 'high': dawdling})
+        self.assertEqual('low', kept['reasoning_effort'])
+        self.assertTrue(any('still out after' in s for s in said), said)
+
+    def test_a_depth_that_lands_within_that_span_is_still_used(self):
+        kept, said = race_slowly({'low': Reader(reading(1), takes=.3),
+                                  'high': Reader(reading(3), takes=.4)})
+        self.assertEqual('high', kept['reasoning_effort'])
+        self.assertFalse(any('still out after' in s for s in said), said)
 
 
 class RaceTests(unittest.TestCase):

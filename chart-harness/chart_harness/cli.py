@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 
 import numpy as np
 from PIL import Image
@@ -137,9 +137,25 @@ def race_readings(efforts,readers,read,size,label):
  resolved here — the pixels settle it downstream.
  """
  readings,failures={},{}
- with ThreadPoolExecutor(max_workers=len(efforts)) as pool:
+ # A second opinion is worth about as long as the reading it would second-guess:
+ # once one depth has answered, the others are given that same span again and
+ # then the run moves on, so a reader that thinks for minutes spends its own time
+ # rather than the review stages'.
+ started=time.monotonic();patience=None
+ pool=ThreadPoolExecutor(max_workers=len(efforts))
+ try:
   pending={pool.submit(progress.bound(read),effort,readers[effort]):effort for effort in efforts}
-  for done in as_completed(pending):
+  waiting=set(pending)
+  while waiting:
+   left=None if patience is None else max(0.,patience-(time.monotonic()-started))
+   try:
+    done=next(as_completed(waiting,timeout=left))
+   except TimeoutError:
+    progress.say('the {e}-reasoning reading is still out after {s:.0f}s, longer than the '
+      'reading it would second-guess took; going on with what is in hand'.format(
+        e=', '.join(pending[f] for f in waiting),s=time.monotonic()-started),source=label)
+    break
+   waiting.discard(done)
    effort=pending[done]
    try:
     reading=done.result()
@@ -149,10 +165,13 @@ def race_readings(efforts,readers,read,size,label):
     progress.say(f'the {effort}-reasoning reading came back unusable: {error}',source=label)
     continue
    readings[effort]=reading
+   if patience is None:patience=2*(time.monotonic()-started)
    progress.say('{e}-reasoning reading is in: {n} series ({names})'.format(e=effort,
      n=len(reading.get('series',[])),
      names=', '.join(str(s.get('label',s['id'])) for s in reading.get('series',[])[:6]) or 'none named'),
      source=label)
+ finally:
+  pool.shutdown(wait=False,cancel_futures=True)
  if not readings:
   # Every reading came back unusable. The page is still a page: the run goes on
   # without a reading, on what the finders can measure in the pixels, and says
