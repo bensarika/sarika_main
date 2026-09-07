@@ -19,6 +19,7 @@ from . import axis_detect
 from . import box_check
 from . import coverage
 from . import detectors
+from . import plot_frame
 
 
 def expectation(image):
@@ -30,14 +31,23 @@ def look(image, methods=None):
     """What python alone can say about one figure."""
     said = {'image': str(image)}
     ticks = axis_detect.detect_ticks(image)
-    box = axis_detect.plot_bbox_from_ticks(ticks)
+    # The rules the figure prints are the plot's own edges; the tick-built box is
+    # only reached for when nothing long enough to be an axis was drawn.
+    measured = plot_frame.frame(image)
+    box = measured['box'] if measured else axis_detect.plot_bbox_from_ticks(ticks)
+    said['box_measured_from'] = (measured['measured_from'] if measured
+                                 else 'the outermost ticks')
     said['ticks'] = {'across': len(ticks.get('x_tick_pixels') or []),
                      'up': len(ticks.get('y_tick_pixels') or [])}
     said['plot_bbox'] = box
     if box is None:
         said['note'] = 'no plot box could be measured from the printed rules and ticks'
         return said
-    said['box'] = box_check.score(image, box)
+    # The rules carry tick strokes that cross the box by construction, so ink is
+    # allowed past an edge as far as the ticks this figure actually printed.
+    ticks_reach = max(int(ticks.get('x_tick_band_px') or 0),
+                      int(ticks.get('y_tick_band_px') or 0))
+    said['box'] = box_check.score(image, box, beyond=ticks_reach)
     bank = detectors.run_all(image, box, outdir=None, methods=methods)
     marks = bank['pooled']
     said['marks'] = {'found': len(marks), 'corroborated': bank['corroborated'],

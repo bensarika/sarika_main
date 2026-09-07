@@ -101,8 +101,8 @@ class Pool(unittest.TestCase):
     def test_every_method_runs_and_agreements_are_recorded(self):
         report = detectors.run_all(line_chart(self.dir / 'line.png'), PLOT,
                                    outdir=self.dir / 'mined')
-        self.assertEqual({'thickness', 'colour', 'shape', 'bar_top', 'curve'},
-                         set(report['methods']))
+        self.assertEqual({'thickness', 'colour', 'shape', 'bar_top', 'curve',
+                          'glyph'}, set(report['methods']))
         self.assertGreaterEqual(report['corroborated'], len(DOTS))
         for mark in report['pooled']:
             if mark['corroborated']:

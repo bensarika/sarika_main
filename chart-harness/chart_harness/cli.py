@@ -353,7 +353,11 @@ def run(args):
    # The box is drawn from the printed rules and ticks, so it can be judged the
    # same way: the ink either continues past its edges or it does not. The
    # verdict travels with the box rather than the watcher having to eyeball it.
-   held=box_check.score(out/'working.png',early_box) if early_box else None
+   # Ink is allowed past an edge as far as the tick strokes this figure printed:
+   # a rule's own ticks cross the box by construction.
+   held=box_check.score(out/'working.png',early_box,
+     beyond=max(int(early.get('x_tick_band_px') or 0),
+                int(early.get('y_tick_band_px') or 0))) if early_box else None
    progress.emit('axes',plot_bbox=early_box,
      x_ticks=early.get('x_tick_pixels',[]),y_ticks=early.get('y_tick_pixels',[]),
      measured_only=True,box=held)

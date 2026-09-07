@@ -24,6 +24,7 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
+from . import glyphs
 from . import markers
 from . import progress
 
@@ -280,6 +281,7 @@ def run_all(image_path, plot_bbox, template_bbox=None, outdir=None, methods=None
         'shape': lambda: by_shape(image_path, plot_bbox, template_bbox, outdir),
         'bar_top': lambda: bar_tops(image_path, plot_bbox),
         'curve': lambda: on_curve(image_path, plot_bbox),
+        'glyph': lambda: glyphs.find(image_path, plot_bbox)['marks'],
     }
     if methods:
         work = {name: call for name, call in work.items() if name in methods}

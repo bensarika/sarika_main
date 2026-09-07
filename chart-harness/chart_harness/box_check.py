@@ -17,8 +17,25 @@ def _mask(image_path):
     return markers.load_gray(image_path) < markers.INK_LEVEL
 
 
-def edges_cutting_ink(image_path, box, mask=None):
-    """Which edges have printed ink running straight through them."""
+def _continues(projection, index, step, depth):
+    """Whether ink at index keeps going that way for depth further pixels."""
+    for k in range(1, depth + 2):
+        ahead = index + step * k
+        if not 0 <= ahead < len(projection) or not projection[ahead]:
+            return False
+    return True
+
+
+def edges_cutting_ink(image_path, box, mask=None, beyond=0):
+    """Which edges have printed ink running straight through them.
+
+    A plot box drawn on the printed rules is crossed by the tick strokes on those
+    rules, which is the figure being drawn correctly, not the box being wrong. So
+    the caller says how far ink is allowed to reach past an edge - the measured
+    tick stroke, never a chosen number - and only ink continuing further than
+    that counts as the box standing in the middle of the drawing. A panel crop
+    stands in blank paper and allows nothing.
+    """
     mask = _mask(image_path) if mask is None else mask
     height, width = mask.shape
     left, top, right, bottom = (int(round(float(v))) for v in box)
@@ -26,31 +43,33 @@ def edges_cutting_ink(image_path, box, mask=None):
     right, bottom = min(width, right), min(height, bottom)
     if right - left < 2 or bottom - top < 2:
         return ['degenerate']
+    depth = int(round(beyond))
     columns = mask[top:bottom].any(axis=0)
     rows = mask[:, left:right].any(axis=1)
     cut = []
-    if left > 0 and columns[left] and columns[left - 1]:
+    if left > 0 and columns[left] and _continues(columns, left, -1, depth):
         cut.append('left')
-    if top > 0 and rows[top] and rows[top - 1]:
+    if top > 0 and rows[top] and _continues(rows, top, -1, depth):
         cut.append('top')
-    if right < width and columns[right - 1] and columns[right]:
+    if right < width and columns[right - 1] and _continues(columns, right - 1, 1, depth):
         cut.append('right')
-    if bottom < height and rows[bottom - 1] and rows[bottom]:
+    if bottom < height and rows[bottom - 1] and _continues(rows, bottom - 1, 1, depth):
         cut.append('bottom')
     return cut
 
 
-def score(image_path, box, mask=None):
+def score(image_path, box, mask=None, beyond=0):
     """What is wrong with this box, in the figure's own measurements."""
     mask = _mask(image_path) if mask is None else mask
     height, width = mask.shape
     left, top, right, bottom = (float(v) for v in box)
-    cut = edges_cutting_ink(image_path, box, mask)
+    cut = edges_cutting_ink(image_path, box, mask, beyond)
     inside = mask[max(0, int(top)):int(bottom), max(0, int(left)):int(right)]
     ink = int(mask.sum())
     return {'box': [left, top, right, bottom],
             'edges_cutting_ink': cut,
             'holds': not cut,
+            'ink_allowed_past_the_edge_px': int(round(beyond)),
             'share_of_the_page_ink_inside': round(float(inside.sum()) / ink, 3) if ink else 0.,
             'share_of_the_page_area': round(
                 ((right - left) * (bottom - top)) / float(width * height), 3)}
