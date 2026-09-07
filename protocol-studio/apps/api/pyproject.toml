@@ -13,15 +13,18 @@ dependencies = [
     "itsdangerous>=2.2",
     "authlib>=1.3",
     "httpx>=0.27",
+    "boto3>=1.34",
     "ps-model",
     "ps-rules",
     "ps-render",
+    "ps-stats",
 ]
 
 [tool.uv.sources]
 ps-model = { workspace = true }
 ps-rules = { workspace = true }
 ps-render = { workspace = true }
+ps-stats = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

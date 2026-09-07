@@ -8,16 +8,18 @@ dependencies = [
     "ps-model",
     "ps-rules",
     "ps-render",
+    "ps-stats",
 ]
 
 [tool.uv.workspace]
-members = ["apps/api", "packages/model", "packages/rules", "packages/render"]
+members = ["apps/api", "packages/model", "packages/rules", "packages/render", "packages/stats"]
 
 [tool.uv.sources]
 protocol-studio-api = { workspace = true }
 ps-model = { workspace = true }
 ps-rules = { workspace = true }
 ps-render = { workspace = true }
+ps-stats = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -32,7 +34,7 @@ dev = [
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-src = ["apps/api", "packages/model/src", "packages/rules/src", "packages/render/src"]
+src = ["apps/api", "packages/model/src", "packages/rules/src", "packages/render/src", "packages/stats/src"]
 extend-exclude = ["mock", "tools"]
 
 [tool.ruff.lint]
@@ -47,10 +49,10 @@ ignore = ["RUF012", "E501", "RUF001", "RUF002", "RUF003"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-packages = ["ps_model", "ps_rules", "ps_render", "protocol_studio"]
-mypy_path = "packages/model/src:packages/rules/src:packages/render/src:apps/api"
+packages = ["ps_model", "ps_rules", "ps_render", "ps_stats", "protocol_studio"]
+mypy_path = "packages/model/src:packages/rules/src:packages/render/src:packages/stats/src:apps/api"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-testpaths = ["apps/api/tests", "packages/model/tests", "packages/rules/tests", "packages/render/tests"]
+testpaths = ["apps/api/tests", "packages/model/tests", "packages/rules/tests", "packages/render/tests", "packages/stats/tests"]
 addopts = "-q"

@@ -43,10 +43,19 @@ class Work(Base):
     __tablename__ = "works"
     id: Mapped[str] = mapped_column(String(40), primary_key=True)  # "W-102"
     title: Mapped[str] = mapped_column(String(400))
-    kind: Mapped[str] = mapped_column(String(16), default="protocol")  # protocol | sap
+    kind: Mapped[str] = mapped_column(String(16), default="protocol")  # protocol | sap (legacy; a work is a study)
     indication: Mapped[str] = mapped_column(String(120), default="")
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     starter: Mapped[str] = mapped_column(String(120), default="")  # provenance of the seed
+    # Study-level metadata shown in the Workspace; the trial model carries the clinical detail.
+    study_code: Mapped[str] = mapped_column(String(64), default="")
+    phase: Mapped[str] = mapped_column(String(16), default="")
+    drugs: Mapped[list[Any]] = mapped_column(JSON, default=list)  # [{"name", "mechanism", "role"}]
+    status: Mapped[str] = mapped_column(String(16), default="draft")  # draft | review | approved | archived
+    sap_status: Mapped[str] = mapped_column(String(16), default="not_started")  # not_started | draft | review
+    data_class: Mapped[str] = mapped_column(
+        String(16), default="internal"
+    )  # public | internal | confidential | restricted
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -114,6 +123,77 @@ class Adjudication(Base):
     actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     revision: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Comment(Base):
+    """Selection-linked discussion. ``anchor`` records block id + quoted text so the thread
+    survives re-wording; ``kind`` separates a comment from a suggestion (proposed wording)."""
+
+    __tablename__ = "comments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    work_id: Mapped[str] = mapped_column(ForeignKey("works.id"), index=True)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("comments.id"), nullable=True, index=True)
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(16), default="comment")  # comment | suggestion
+    section_id: Mapped[str] = mapped_column(String(32), default="")
+    block_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+    anchor_text: Mapped[str] = mapped_column(Text, default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    suggested_text: Mapped[str] = mapped_column(Text, default="")
+    resolved: Mapped[bool] = mapped_column(default=False)
+    resolved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Presence(Base):
+    """Last-seen heartbeat per (work, user) so collaborators see who is in a document."""
+
+    __tablename__ = "presence"
+    __table_args__ = (UniqueConstraint("work_id", "user_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    work_id: Mapped[str] = mapped_column(ForeignKey("works.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    section_id: Mapped[str] = mapped_column(String(32), default="")
+    seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ProviderPolicy(Base):
+    """Which model provider may receive which data class. Absent row = not approved (fail closed)."""
+
+    __tablename__ = "provider_policies"
+    __table_args__ = (UniqueConstraint("provider", "data_class"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32))  # openai | ...
+    data_class: Mapped[str] = mapped_column(String(16))
+    approved: Mapped[bool] = mapped_column(default=False)
+    approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SourceRecord(Base):
+    """An ingested or connected source document (upload, S3 object, link). Parsed once, reused."""
+
+    __tablename__ = "source_records"
+    id: Mapped[str] = mapped_column(String(48), primary_key=True)  # "src-<hex>"
+    name: Mapped[str] = mapped_column(String(400))
+    document_type: Mapped[str] = mapped_column(String(32), default="other")
+    origin: Mapped[str] = mapped_column(String(16), default="upload")  # upload | s3 | dropbox | link
+    uri: Mapped[str] = mapped_column(Text, default="")
+    sha256: Mapped[str] = mapped_column(String(64), default="", index=True)
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    media_type: Mapped[str] = mapped_column(String(80), default="")
+    status: Mapped[str] = mapped_column(
+        String(24), default="uploaded"
+    )  # uploaded | extracted | review | canonical | failed
+    indication: Mapped[str] = mapped_column(String(120), default="")
+    study_identifier: Mapped[str] = mapped_column(String(120), default="")
+    extraction: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    visibility: Mapped[str] = mapped_column(String(16), default="workspace")  # workspace | study | private
+    work_id: Mapped[str | None] = mapped_column(ForeignKey("works.id"), nullable=True, index=True)
+    uploaded_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class AuditEvent(Base):

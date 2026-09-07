@@ -23,7 +23,10 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
-from protocol_studio.engine.state import Block, Claim, DraftState
+from protocol_studio.engine import adaptation as adapt
+from protocol_studio.engine import key_inputs
+from protocol_studio.engine.state import Block, Claim, DraftState, DrugSpec, Proposal
+from protocol_studio.engine.textcheck import factual_changes
 from ps_model.paths import PathError, delete_path, get_path, set_path
 from ps_model.schema import validate_model
 from ps_rules.rules_claims import check_claims
@@ -112,6 +115,53 @@ class SetNotApplicable(_Cmd):
     reason: str | None = None  # None → clear
 
 
+class StartAdaptation(_Cmd):
+    """Generate adaptation proposals for the target drug(s); replaces any unfinished adaptation."""
+
+    type: Literal["start_adaptation"] = "start_adaptation"
+    source_drug: str
+    source_mechanism: str = ""
+    target_drugs: list[DrugSpec]
+
+
+class DecideAdaptationChange(_Cmd):
+    type: Literal["decide_adaptation_change"] = "decide_adaptation_change"
+    change_id: str
+    decision: Literal["accepted", "rejected", "pending"]
+
+
+class SetEvidenceRequirement(_Cmd):
+    type: Literal["set_evidence_requirement"] = "set_evidence_requirement"
+    requirement_id: str
+    status: Literal["open", "linked", "waived"]
+    source_id: str | None = None
+    note: str = ""
+
+
+class AnswerKeyInput(_Cmd):
+    type: Literal["answer_key_input"] = "answer_key_input"
+    question_id: str
+    value: Any
+
+
+class ProposeText(_Cmd):
+    """Attach a pending replacement to a block (AI revision, reviewer suggestion, tracked change)."""
+
+    type: Literal["propose_text"] = "propose_text"
+    block_id: str
+    text: str
+    origin: Literal["author", "ai", "suggestion"] = "author"
+    instruction: str = ""
+
+
+class ResolveProposal(_Cmd):
+    """Accept replaces the block text with the proposal; discard leaves the original untouched."""
+
+    type: Literal["resolve_proposal"] = "resolve_proposal"
+    block_id: str
+    accept: bool
+
+
 Command = Annotated[
     SetField
     | AddEntity
@@ -121,7 +171,13 @@ Command = Annotated[
     | SetBlockApproval
     | SetClaim
     | ResolveClaim
-    | SetNotApplicable,
+    | SetNotApplicable
+    | StartAdaptation
+    | DecideAdaptationChange
+    | SetEvidenceRequirement
+    | AnswerKeyInput
+    | ProposeText
+    | ResolveProposal,
     Field(discriminator="type"),
 ]
 
@@ -282,6 +338,73 @@ def _dispatch(s: DraftState, cmd: Command, actor: str) -> str:
             return f"Marked {cmd.slot_id} not applicable: {cmd.reason}"
         s.not_applicable.pop(cmd.slot_id, None)
         return f"Cleared not-applicable on {cmd.slot_id}"
+
+    if isinstance(cmd, StartAdaptation):
+        try:
+            s.adaptation = adapt.build_adaptation(
+                s,
+                source_drug=cmd.source_drug,
+                source_mechanism=cmd.source_mechanism,
+                targets=cmd.target_drugs,
+                actor=actor,
+                now=_now(),
+            )
+        except ValueError as e:
+            raise CommandError(str(e)) from e
+        names = ", ".join(d.name for d in cmd.target_drugs)
+        return f"Started adaptation {cmd.source_drug} → {names}: {len(s.adaptation.changes)} proposed changes"
+
+    if isinstance(cmd, DecideAdaptationChange):
+        try:
+            summary = adapt.apply_decision(s, cmd.change_id, cmd.decision, actor=actor, now=_now())
+        except KeyError as e:
+            raise CommandError(str(e)) from e
+        _check_schema(s.model)
+        return summary
+
+    if isinstance(cmd, SetEvidenceRequirement):
+        if s.adaptation is None:
+            raise CommandError("no adaptation in progress")
+        try:
+            r = s.adaptation.requirement(cmd.requirement_id)
+        except KeyError as e:
+            raise CommandError(str(e)) from e
+        r.status, r.source_id, r.note = cmd.status, cmd.source_id, cmd.note
+        return f"Evidence requirement '{r.label}' marked {cmd.status}"
+
+    if isinstance(cmd, AnswerKeyInput):
+        try:
+            written, sections = key_inputs.answer(s, cmd.question_id, cmd.value, actor=actor, now=_now())
+        except (KeyError, PathError, ValueError) as e:
+            raise CommandError(str(e)) from e
+        _check_schema(s.model)
+        return f"Key input {cmd.question_id} = {cmd.value!r} → {len(written)} fields; review {', '.join(sections)}"
+
+    if isinstance(cmd, ProposeText):
+        b = _block(s, cmd.block_id)
+        b.proposal = Proposal(
+            text=cmd.text,
+            origin=cmd.origin,
+            instruction=cmd.instruction,
+            factual_changes=factual_changes(b.text, cmd.text, [c.model_dump() for c in b.claims]),
+            proposed_by=actor,
+            proposed_at=_now(),
+        )
+        return f"Proposed {cmd.origin} revision for block {b.id}"
+
+    if isinstance(cmd, ResolveProposal):
+        b = _block(s, cmd.block_id)
+        if b.proposal is None:
+            raise CommandError(f"block {b.id} has no pending proposal")
+        p = b.proposal
+        b.proposal = None
+        if not cmd.accept:
+            return f"Discarded {p.origin} revision for block {b.id}"
+        b.text, b.updated_by, b.updated_at = p.text, actor, _now()
+        b.provenance = "generated" if p.origin == "ai" else b.provenance
+        if b.approval == "approved":
+            b.approval = "unreviewed"
+        return f"Accepted {p.origin} revision for block {b.id}"
 
     raise CommandError(f"unknown command {type(cmd).__name__}")  # pragma: no cover
 

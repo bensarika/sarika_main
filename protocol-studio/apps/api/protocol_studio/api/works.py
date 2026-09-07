@@ -10,6 +10,10 @@
     GET    /api/works/{id}/history           revision log
     GET    /api/works/{id}/outline           outline with per-section completion (sidebar)
     PUT    /api/works/{id}/permissions       set a user's level on the work (work admin)
+    PATCH  /api/works/{id}                   study metadata (title, status, data_class, drugs…)
+    GET    /api/works/{id}/adaptation        adaptation proposals + evidence requirements + summary
+    GET    /api/works/{id}/key-inputs        grouped questionnaire with current values and coverage
+    GET    /api/works/{id}/proposals         blocks with pending text proposals (tracked changes)
 
 Autosave is simply "the client sends commands as the author types"; every
 command is durable and revisioned, so there is no separate backup path.
@@ -28,8 +32,10 @@ from sqlalchemy.orm import Session
 
 from protocol_studio.auth.session import audit, current_user, require_work, work_level
 from protocol_studio.db import Adjudication, Draft, Permission, Revision, User, Work, get_session
+from protocol_studio.engine.adaptation import adaptation_summary
 from protocol_studio.engine.commands import Command, CommandError, ConflictError, apply_command
 from protocol_studio.engine.evaluation import evaluate
+from protocol_studio.engine.key_inputs import questionnaire
 from protocol_studio.engine.state import DraftState
 from protocol_studio.library import starter_state
 from ps_model.outline import OUTLINE
@@ -49,6 +55,12 @@ def _work_json(db: Session, user: User, w: Work) -> dict[str, Any]:
         "indication": w.indication,
         "owner_id": w.owner_id,
         "starter": w.starter,
+        "study_code": w.study_code,
+        "phase": w.phase,
+        "drugs": w.drugs,
+        "status": w.status,
+        "sap_status": w.sap_status,
+        "data_class": w.data_class,
         "revision": d.revision if d else 0,
         "created_at": w.created_at.isoformat(),
         "updated_at": w.updated_at.isoformat(),
@@ -77,17 +89,54 @@ def _new_work_id(db: Session) -> str:
 # ----------------------------------------------------------------------------- routes
 
 
+class DrugIn(BaseModel):
+    name: str
+    mechanism: str = ""
+    role: str = "investigational"
+
+
 class CreateWork(BaseModel):
     title: str
     indication: str = "atopic dermatitis"
     kind: str = "protocol"
     starter: str = "blank"  # "blank" or a library starter id
+    study_code: str = ""
+    phase: str = ""
+    drugs: list[DrugIn] = []
+    data_class: str = "internal"
+
+
+class PatchWork(BaseModel):
+    title: str | None = None
+    indication: str | None = None
+    study_code: str | None = None
+    phase: str | None = None
+    drugs: list[DrugIn] | None = None
+    status: str | None = None
+    sap_status: str | None = None
+    data_class: str | None = None
+
+
+_STATUSES = {"draft", "review", "approved", "archived"}
+_SAP_STATUSES = {"not_started", "draft", "review", "approved"}
+_DATA_CLASSES = {"public", "internal", "confidential", "restricted"}
 
 
 @router.get("")
 def list_works(user: User = Depends(current_user), db: Session = Depends(get_session)) -> list[dict[str, Any]]:
     works = db.scalars(select(Work).order_by(Work.updated_at.desc())).all()
-    return [_work_json(db, user, w) for w in works if work_level(db, user, w)]
+    out = []
+    for w in works:
+        if not work_level(db, user, w):
+            continue
+        row = _work_json(db, user, w)
+        d = db.get(Draft, w.id)
+        if d is not None:
+            ev = evaluate(DraftState.model_validate({**d.state, "revision": d.revision}), adjudication_map(db, w.id))
+            row["completion_pct"] = ev["completion"]["overall"]["pct"]
+            row["open_findings"] = ev["counts"]["error"] + ev["counts"]["warning"]
+        out.append(row)
+    return out
 
 
 @router.post("", status_code=201)
@@ -101,8 +150,19 @@ def create_work(
         state = starter_state(body.starter, protocol_id=wid, title=body.title, indication=body.indication)
     except KeyError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"unknown starter {body.starter}") from e
+    if body.data_class not in _DATA_CLASSES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"data_class must be one of {sorted(_DATA_CLASSES)}")
     w = Work(
-        id=wid, title=body.title, kind=body.kind, indication=body.indication, owner_id=user.id, starter=body.starter
+        id=wid,
+        title=body.title,
+        kind=body.kind,
+        indication=body.indication,
+        owner_id=user.id,
+        starter=body.starter,
+        study_code=body.study_code,
+        phase=body.phase,
+        drugs=[d.model_dump() for d in body.drugs],
+        data_class=body.data_class,
     )
     db.add(w)
     db.flush()  # the draft's FK needs the work row first
@@ -128,9 +188,84 @@ def get_work(
     }
 
 
+@router.patch("/{work_id}")
+def patch_work(
+    body: PatchWork,
+    work: Work = Depends(require_work("edit")),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    if body.status is not None and body.status not in _STATUSES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"status must be one of {sorted(_STATUSES)}")
+    if body.sap_status is not None and body.sap_status not in _SAP_STATUSES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"sap_status must be one of {sorted(_SAP_STATUSES)}")
+    if body.data_class is not None and body.data_class not in _DATA_CLASSES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"data_class must be one of {sorted(_DATA_CLASSES)}")
+    if body.status == "approved":
+        ev = evaluate(load_state(db, work.id), adjudication_map(db, work.id))
+        if not ev["readiness"]["ready"]:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, {"error": "not_ready", "blockers": ev["readiness"]["blockers"]}
+            )
+    changed = body.model_dump(exclude_none=True)
+    if body.title is not None:
+        work.title = body.title
+    if body.indication is not None:
+        work.indication = body.indication
+    if body.study_code is not None:
+        work.study_code = body.study_code
+    if body.phase is not None:
+        work.phase = body.phase
+    if body.status is not None:
+        work.status = body.status
+    if body.sap_status is not None:
+        work.sap_status = body.sap_status
+    if body.data_class is not None:
+        work.data_class = body.data_class
+    if body.drugs is not None:
+        work.drugs = [d.model_dump() for d in body.drugs]
+    work.updated_at = datetime.now(UTC)
+    audit(db, actor=user, action="work.update", work_id=work.id, **changed)
+    db.commit()
+    return _work_json(db, user, work)
+
+
 @router.get("/{work_id}/draft")
 def get_draft(work: Work = Depends(require_work("view")), db: Session = Depends(get_session)) -> dict[str, Any]:
     return load_state(db, work.id).model_dump()
+
+
+@router.get("/{work_id}/adaptation")
+def get_adaptation(work: Work = Depends(require_work("view")), db: Session = Depends(get_session)) -> dict[str, Any]:
+    st = load_state(db, work.id)
+    return {
+        "summary": adaptation_summary(st.adaptation),
+        "adaptation": st.adaptation.model_dump() if st.adaptation else None,
+        "revision": st.revision,
+    }
+
+
+@router.get("/{work_id}/key-inputs")
+def get_key_inputs(work: Work = Depends(require_work("view")), db: Session = Depends(get_session)) -> dict[str, Any]:
+    st = load_state(db, work.id)
+    return {**questionnaire(st), "revision": st.revision}
+
+
+@router.get("/{work_id}/proposals")
+def get_proposals(work: Work = Depends(require_work("view")), db: Session = Depends(get_session)) -> dict[str, Any]:
+    st = load_state(db, work.id)
+    rows = [
+        {
+            "block_id": b.id,
+            "section_id": b.section_id,
+            "subsection_id": b.subsection_id,
+            "original": b.text,
+            "proposal": b.proposal.model_dump(),
+        }
+        for b in st.blocks
+        if b.proposal is not None
+    ]
+    return {"revision": st.revision, "proposals": rows}
 
 
 @router.post("/{work_id}/commands")
