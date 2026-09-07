@@ -22,6 +22,7 @@ from .calibration import recheck_packet
 from . import axis_detect
 from . import detectors
 from . import doc_context
+from . import gaps
 from . import duel
 from . import frame_fit
 from .consensus import compare
@@ -292,6 +293,7 @@ def run(args):
   # shape pass over the whole plot, bar tops, and following the curves - because
   # no one of them reads every figure. Their hits are pooled and a location more
   # than one of them found is recorded as corroborated.
+  bank=None
   if (config.get('detect_marks_without_legend',True)
       and not any(s.get('template_bbox') for s in interpretation['series'])):
    bank=detectors.run_all(out/'working.png',interpretation['plot_bbox'],
@@ -444,6 +446,33 @@ def run(args):
     result=geometry.finalize(out/'working.png',interpretation,proposals,revised_review,out/'final')
     result['initial_axis_agreement']=first_agreement
     result['calibration_recheck_used']=True
+  # A series is printed at a rhythm, so the marks it kept say how many it should
+  # have: a jump several steps wide is a hole, and the hole's width says how many
+  # marks belong in it. The predicted places are only places to look - a mark is
+  # added back solely where a finder already located ink - and whatever stays
+  # empty is reported as missing rather than passed over.
+  if config.get('estimate_missing_from_spacing',True) and result.get('rows'):
+   if bank is None:
+    bank=detectors.run_all(out/'working.png',interpretation['plot_bbox'],
+      methods=config.get('detection_methods'))
+   spacing_report=gaps.report(result['rows'],bank['pooled'],
+     bank['corroboration_radius_px'] or 0.,
+     {s['id']:s.get('label',s['id']) for s in interpretation.get('series',[])})
+   result['spacing_check']={'series':spacing_report,
+     'missing':sum(e['missing'] for e in spacing_report.values()),
+     'recoverable':sum(len(e['recovered']) for e in spacing_report.values()),
+     'search_radius_px':bank['corroboration_radius_px'],
+     'basis':'median spacing of the accepted marks in each series'}
+   if result['spacing_check']['missing']:
+    result['status']='review_required'
+    result.setdefault('diagnostics',[]).append({'code':'series_shorter_than_its_spacing_implies',
+      'missing':result['spacing_check']['missing'],
+      'advice':gaps.advice(spacing_report)})
+   progress.emit('spacing',missing=result['spacing_check']['missing'],
+     recoverable=result['spacing_check']['recoverable'],
+     series={k:{'kept':v['kept'],'expected':v['expected'],'missing':v['missing'],
+                'step_px':v['step_px'],'label':v['label']} for k,v in spacing_report.items()},
+     predicted=[h['predicted'][0] for e in spacing_report.values() for h in e['holes']][:200])
   # Entire-job completeness is stricter than candidate precision.
   unresolved=interpretation.get('unresolved_regions',[])
   if unresolved or review.get('missing_points') or review.get('status')!='accepted':

@@ -88,7 +88,7 @@ function viewer(host) {
   const v = {
     image: null, scale: 1, x: 0, y: 0, fitted: false,
     layers: { marks: true, candidates: true, reading: true, axes: true, ids: true },
-    marks: [], plot: null, ticks: null, candidates: [], screen: new Map(), rows: [],
+    marks: [], predicted: [], plot: null, ticks: null, candidates: [], screen: new Map(), rows: [],
     onhover: () => {}
   };
   v.load = src => {
@@ -122,11 +122,25 @@ function viewer(host) {
       }
     }
     if (v.layers.marks) {
-      context.strokeStyle = COLOUR.mark;
       for (const m of v.marks) {
+        // A pooled mark carries its measured width rather than a box; either way
+        // what is drawn is the body python measured, at the size it measured.
+        const w = m.bbox ? m.bbox[2] - m.bbox[0] : (m.width || font);
+        const h = m.bbox ? m.bbox[3] - m.bbox[1] : (m.height || m.width || font);
+        const x = m.bbox ? m.bbox[0] : m.x - w / 2;
+        const y = m.bbox ? m.bbox[1] : m.y - h / 2;
         context.strokeStyle = m.crowded ? COLOUR.crowded : COLOUR.mark;
-        context.strokeRect(m.bbox[0], m.bbox[1], m.bbox[2] - m.bbox[0], m.bbox[3] - m.bbox[1]);
+        context.strokeRect(x, y, w, h);
       }
+      // Where the spacing of the kept marks says another mark belongs.
+      context.strokeStyle = COLOUR.crowded;
+      context.setLineDash([font * .4, font * .4]);
+      for (const p of v.predicted) {
+        context.beginPath();
+        context.arc(p.x, p.y, font * .8, 0, 2 * Math.PI);
+        context.stroke();
+      }
+      context.setLineDash([]);
     }
     for (const point of v.points()) {
       context.strokeStyle = point.colour;
@@ -394,6 +408,23 @@ const render = {
     p.screened = `${e.checked} checked · ${e.failed} failed the source pixels · ${e.corrected} moved by python`;
     wrap.append($('div', null, p.screened), s);
     show(p, 'screen', wrap);
+  },
+  spacing(p, e) {
+    // How many marks each series should hold, judged by the spacing of the ones
+    // it kept: a jump several steps wide is a hole, and the places it predicts
+    // are drawn so a short series is visible rather than quietly accepted.
+    p.view.predicted = e.predicted || [];
+    p.view.draw();
+    const t = $('table');
+    t.append(row('th', ['group', 'kept', 'expected from spacing', 'missing', 'step']));
+    for (const [id, s] of Object.entries(e.series || {}))
+      t.append(row('td', [s.label || id, s.kept, s.expected, s.missing,
+        s.step_px == null ? '' : Math.round(s.step_px) + 'px']));
+    const wrap = $('div');
+    wrap.append($('div', null, e.missing
+      ? `${e.missing} mark(s) unaccounted for · ${e.recoverable} sit on ink a finder already located`
+      : 'every series is as long as its own spacing implies'), t);
+    show(p, 'spacing', wrap);
   },
   judgment(p, e) {
     const wrap = $('div');

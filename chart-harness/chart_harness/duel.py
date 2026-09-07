@@ -54,10 +54,15 @@ def self_reflection(run_dir):
     for panel in _panels(run_dir):
         review = _read(panel / 'review.json', {})
         screen = _read(panel / 'candidate_screen.json', [])
+        spacing = _read(panel / 'result.json', {}).get('spacing_check') or {}
         check = review.get('_visual_check') or {}
         panels.append({
             'panel': panel.name,
             'review_status': review.get('status'),
+            'spacing': {'missing': spacing.get('missing', 0),
+                        'recoverable': spacing.get('recoverable', 0),
+                        'per_series': {k: {'kept': v['kept'], 'expected': v['expected']}
+                                       for k, v in (spacing.get('series') or {}).items()}},
             'notes': [str(n)[:300] for n in review.get('notes', [])][:20],
             'visual_check': check.get('assessment'),
             'screen': {'checked': len(screen),
@@ -109,6 +114,12 @@ def _screen_failed(reflection):
     return any(panel['screen']['failed'] for panel in reflection.get('panels', []))
 
 
+def _short_of_its_spacing(reflection):
+    """Series that kept fewer marks than the rhythm of their own marks implies."""
+    return sum(panel.get('spacing', {}).get('missing', 0)
+               for panel in reflection.get('panels', []))
+
+
 def decide(judgment, reflection, comparison, threshold=3):
     """Whether this run earns another pass, and the reasons to hand it."""
     findings = weigh(judgment, reflection)
@@ -118,13 +129,17 @@ def decide(judgment, reflection, comparison, threshold=3):
                         'detail': judgment.get('worst_problem') or ''})
     if _screen_failed(reflection):
         reasons.append({'code': 'candidates_failed_the_pixel_screen'})
+    missing = _short_of_its_spacing(reflection)
+    if missing:
+        reasons.append({'code': 'series_shorter_than_their_spacing_implies',
+                        'detail': f'{missing} mark(s) unaccounted for between kept points'})
     if any(panel.get('review_status') != 'accepted'
            for panel in reflection.get('panels', [])):
         reasons.append({'code': 'review_not_accepted'})
     for disagreement in (comparison or {}).get('disagreements', []):
         reasons.append({'code': 'cross_run_' + disagreement['code']})
     top = [f for f in findings if f['weight'] >= threshold]
-    return {'iterate': bool(reasons and (top or _screen_failed(reflection))),
+    return {'iterate': bool(reasons and (top or _screen_failed(reflection) or missing)),
             'reasons': reasons, 'findings': findings, 'act_on': top}
 
 
