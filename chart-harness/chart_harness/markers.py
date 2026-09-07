@@ -48,6 +48,11 @@ def _length(gray, fraction, floor=1):
     return max(floor, int(round(figure_scale(gray) * fraction)))
 
 
+def mark_side(gray):
+    """How big a mark is on this page, in pixels."""
+    return _length(gray, PLOT_MARKER_SIDE_FRACTION, floor=8)
+
+
 def load_gray(image_path):
     with Image.open(image_path) as im:
         return np.asarray(im.convert('L'), dtype=float) / 255.

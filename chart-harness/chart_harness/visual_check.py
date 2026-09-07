@@ -2,6 +2,7 @@
 import hashlib,json,math
 from pathlib import Path
 from PIL import Image,ImageDraw,ImageFont
+from .provider import measures
 
 class VisualCheckError(ValueError):pass
 
@@ -44,8 +45,11 @@ def render(source,points,annotations,path,title):
 class VisualCheckProvider:
  """Wrap every image-bearing model call. No opt-out or alternate annotator model."""
  def __init__(self,provider,out,strict=True):self.provider=provider;self.out=Path(out);self.strict=strict
- def complete(self,stage,prompt,images=(),schema=None):
-  result=self.provider.complete(stage,prompt,images,schema)
+ @property
+ def can_measure(self):return measures(self.provider)
+ def complete(self,stage,prompt,images=(),schema=None,tools=None,tool_runner=None):
+  measuring={'tools':tools,'tool_runner':tool_runner} if tools else {}
+  result=self.provider.complete(stage,prompt,images,schema,**measuring)
   return self.check(stage,result,images,prompt)
  def check(self,stage,result,images,prompt=""):
   if not images:return result

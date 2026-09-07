@@ -12,7 +12,8 @@ from unittest.mock import patch
 
 from chart_harness.provider import (
     BudgetExceeded, ExchangeProvider, InvalidResponse, ModelConfig, PendingResponse,
-    Provider, ProviderError, ReplayProvider, estimate_cost, normalize_usage, parse_json_object,
+    Provider, ProviderError, ReplayProvider, estimate_cost, measures, normalize_usage,
+    parse_json_object,
 )
 
 
@@ -84,6 +85,103 @@ def dribbling_server(stop):
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def asking(name, arguments, call_id="call-1"):
+    """A reply that stops to ask Python to measure something."""
+    return {"id": "stub-ask", "choices": [{"finish_reason": "tool_calls", "message": {
+        "content": None, "tool_calls": [{"id": call_id, "type": "function",
+                                         "function": {"name": name, "arguments": json.dumps(arguments)}}]}}]}
+
+
+class Measured:
+    """A stand-in for the figure: records what was asked, answers plainly."""
+    def __init__(self, answer=None):
+        self.asked = []
+        self.answer = answer if answer is not None else {"ink_fraction": .8, "would_be_kept": True}
+
+    def run(self, name, arguments):
+        self.asked.append((name, arguments))
+        return self.answer
+
+
+class ReadersThatMeasureFirst(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.tools = [{"type": "function", "function": {
+            "name": "measure_ink_at", "description": "measure",
+            "parameters": {"type": "object", "properties": {"x": {"type": "number"}}}}}]
+
+    def test_an_ask_is_measured_and_the_conversation_carries_on_to_the_answer(self):
+        figure = Measured()
+        with stub_server([(200, asking("measure_ink_at", {"x": 12})),
+                          (200, completion('{"series": ["a"]}'))]) as (url, calls):
+            provider = Provider(ModelConfig("arbitrary/user-model", url), self.root)
+            result = provider.complete("interpret", "prompt", tools=self.tools, tool_runner=figure)
+        self.assertEqual({"series": ["a"]}, result)
+        self.assertEqual([("measure_ink_at", {"x": 12})], figure.asked)
+        answered = calls[1]["body"]["messages"][-1]
+        self.assertEqual("tool", answered["role"])
+        self.assertEqual("call-1", answered["tool_call_id"])
+        self.assertTrue(json.loads(answered["content"])["would_be_kept"])
+
+    def test_the_measurements_are_offered_with_the_prompt(self):
+        with stub_server([(200, completion())]) as (url, calls):
+            provider = Provider(ModelConfig("arbitrary/user-model", url), self.root)
+            provider.complete("interpret", "prompt", tools=self.tools, tool_runner=Measured())
+        self.assertEqual(["measure_ink_at"], [t["function"]["name"] for t in calls[0]["body"]["tools"]])
+        self.assertEqual("auto", calls[0]["body"]["tool_choice"])
+
+    def test_a_reader_that_only_measures_is_made_to_answer_rather_than_loop(self):
+        figure = Measured()
+        rounds = 2
+        replies = [(200, asking("measure_ink_at", {"x": n})) for n in range(rounds)]
+        with stub_server([*replies, (200, completion('{"series": []}'))]) as (url, calls):
+            provider = Provider(ModelConfig("arbitrary/user-model", url, max_tool_rounds=rounds), self.root)
+            result = provider.complete("interpret", "prompt", tools=self.tools, tool_runner=figure)
+        self.assertEqual({"series": []}, result)
+        self.assertEqual(rounds, len(figure.asked))
+        last = calls[-1]["body"]
+        self.assertNotIn("tools", last)
+        self.assertIn("Answer now", last["messages"][-1]["content"])
+
+    def test_a_failed_measurement_is_answered_and_the_reading_continues(self):
+        class Breaks:
+            def run(self, name, arguments):
+                raise RuntimeError("that region is off the page")
+        with stub_server([(200, asking("measure_ink_at", {"x": 12})),
+                          (200, completion('{"series": ["a"]}'))]) as (url, calls):
+            provider = Provider(ModelConfig("arbitrary/user-model", url), self.root)
+            result = provider.complete("interpret", "prompt", tools=self.tools, tool_runner=Breaks())
+        self.assertEqual({"series": ["a"]}, result)
+        self.assertIn("off the page", json.loads(calls[1]["body"]["messages"][-1]["content"])["error"])
+
+    def test_a_turn_that_may_be_a_question_is_not_forced_into_json(self):
+        """Demanding an object of a turn that wants to ask makes it write the ask as prose."""
+        figure = Measured()
+        with stub_server([(200, asking("measure_ink_at", {"x": 12})),
+                          (200, completion('{"series": []}'))]) as (url, calls):
+            provider = Provider(ModelConfig("arbitrary/user-model", url, json_mode=True,
+                                            max_tool_rounds=1), self.root)
+            provider.complete("interpret", "prompt", tools=self.tools, tool_runner=figure)
+        offered, final = calls[0]["body"], calls[-1]["body"]
+        self.assertIn("tools", offered)
+        self.assertNotIn("response_format", offered)
+        self.assertNotIn("tools", final)
+        self.assertEqual({"type": "json_object"}, final["response_format"])
+
+    def test_an_endpoint_that_cannot_carry_questions_is_not_given_tools(self):
+        chatting = Provider(ModelConfig("arbitrary/user-model", "https://example.invalid/v1"), self.root)
+        other = Provider(ModelConfig("arbitrary/user-model", "https://example.invalid/v1",
+                                     wire_api="responses"), self.root)
+        self.assertTrue(measures(chatting))
+        self.assertFalse(measures(other))
+        self.assertFalse(measures(object()))
+
+    def test_tools_offered_with_nothing_to_run_them_is_a_mistake(self):
+        provider = Provider(ModelConfig("arbitrary/user-model", "https://example.invalid/v1"), self.root)
+        with self.assertRaises(ValueError):
+            provider.complete("interpret", "prompt", tools=self.tools)
 
 
 class ProviderTests(unittest.TestCase):

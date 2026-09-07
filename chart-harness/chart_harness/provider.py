@@ -30,7 +30,7 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Protocol, Sequence
 from urllib import error, parse, request
 import uuid
 
@@ -152,6 +152,10 @@ class ModelConfig:
     reasoning_effort: str | None = None
     wire_api: str = "chat"
     image_detail: str | None = None
+    # How many times a reader may stop and ask Python to measure something before
+    # it has to answer. Each round is a round trip, so the run's own clock, not
+    # this number, usually ends the conversation.
+    max_tool_rounds: int = 6
 
     def __post_init__(self) -> None:
         if self.wire_api not in {"chat", "responses"}: raise ValueError("Unsupported wire_api")
@@ -224,6 +228,62 @@ def estimate_cost(usage: Any, pricing: Mapping[str, float] | None) -> float | No
     if cached > inp:
         return None
     return ((inp - cached) * pricing["input"] + cached * cached_rate + out * pricing["output"]) / 1_000_000
+
+
+def measures(provider: object) -> bool:
+    """Whether this reader's endpoint will carry its questions back to Python.
+
+    Asked of the object rather than its class: a stand-in that knows nothing of
+    measuring simply answers no and is given none.
+    """
+    try:
+        return bool(provider.can_measure)
+    except AttributeError:
+        return False
+
+
+class ToolRunner(Protocol):
+    """Whatever can measure the figure for a reader that asks."""
+    def run(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]: ...
+
+
+def asked_to_measure(response: dict[str, Any]) -> list[dict[str, Any]]:
+    """The measurements a reader stopped to ask for, if it asked for any."""
+    try:
+        calls = response["choices"][0]["message"].get("tool_calls")
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return []
+    if not isinstance(calls, list):
+        return []
+    return [call for call in calls if isinstance(call, dict) and call.get("id")]
+
+
+def _asked(response: dict[str, Any]) -> dict[str, Any]:
+    """The reader's own turn, put back in the conversation so its asks make sense."""
+    message = response["choices"][0]["message"]
+    return {"role": "assistant", "content": message.get("content"),
+            "tool_calls": message.get("tool_calls")}
+
+
+def answer_of_a_measurement(call: dict[str, Any], runner: ToolRunner) -> dict[str, Any]:
+    """Run one asked-for measurement; a bad ask is answered, never fatal."""
+    function = call.get("function") or {}
+    name = function.get("name")
+    raw = function.get("arguments") or "{}"
+    try:
+        arguments = parse_json_object(raw) if isinstance(raw, str) else dict(raw)
+    except (InvalidResponse, TypeError, ValueError):
+        arguments = None
+    if arguments is None:
+        answer: dict[str, Any] = {"error": "the arguments were not readable JSON; ask again"}
+    elif not isinstance(name, str):
+        answer = {"error": "no measurement of that name; see the list you were given"}
+    else:
+        try:
+            answer = runner.run(name, arguments)
+        except Exception as exc:  # A failed measurement is a fact to report, not an end.
+            answer = {"error": f"{type(exc).__name__}: {exc}"}
+    return {"role": "tool", "tool_call_id": call["id"], "content": _json(answer)}
 
 
 def _response_data(response: dict[str, Any]) -> dict[str, Any]:
@@ -393,9 +453,19 @@ class Provider(_Journal):
                 self.estimated_reserved_cost_usd += estimate
         return estimate
 
-    def complete(self, stage: str, prompt: str, images: Sequence[Path] = (), schema: dict[str, Any] | None = None) -> dict[str, Any]:
+    @property
+    def can_measure(self) -> bool:
+        """Whether this endpoint will carry a reader's questions back to Python."""
+        return self.config.wire_api == "chat"
+
+    def complete(self, stage: str, prompt: str, images: Sequence[Path] = (), schema: dict[str, Any] | None = None,
+                 tools: Sequence[dict[str, Any]] | None = None, tool_runner: "ToolRunner | None" = None) -> dict[str, Any]:
         if not isinstance(stage, str) or not isinstance(prompt, str):
             raise ValueError("stage and prompt must be strings")
+        if tools and self.config.wire_api != "chat":
+            raise ValueError("measuring tools need the chat wire api")
+        if tools and tool_runner is None:
+            raise ValueError("tools were offered with nothing to run them")
         metadata, image_content = _image_inputs(images)
         if schema is not None:
             parse_json_object(_json(schema))
@@ -416,23 +486,8 @@ class Provider(_Journal):
             if "reasoning_effort" in settings: settings["reasoning"]={"effort":settings.pop("reasoning_effort")}
             if "response_format" in settings: settings["text"]={"format":settings.pop("response_format")}
         settings_identity={**settings,"image_detail":self.config.image_detail}
-        identity = {"cache_version": 1, "endpoint": self.config.endpoint, "settings": settings_identity,
-                    "prompt": effective_prompt, "images": metadata, "schema": schema}
-        key = _digest(identity)
-        cache_path = self.cache_dir / (key + ".json")
-        common = {"stage": stage, "model": self.config.name, "endpoint": self.config.endpoint,
-                  "api_key_env": self.config.api_key_env, "cache_key": key,
-                  "prompt_sha256": hashlib.sha256(effective_prompt.encode()).hexdigest(), "images": metadata}
-        if cache_path.exists():
-            cached = parse_json_object(cache_path.read_text(encoding="utf-8"))
-            if cached.get("cache_key") != key or cached.get("provider_mode") != "live_api":
-                raise InvalidResponse("Cache identity or provenance does not match")
-            result = _response_data(cached["response"])
-            self._record({**common, "event": "cache_hit", "reported_usage": None,
-                          "source_reported_usage": cached["response"].get("usage"),
-                          "estimated_cost_usd": 0.0, "billed_this_run_usd": 0.0,
-                          "live_request": False, "raw_artifact": str(cache_path)})
-            return result
+        if self.config.image_detail:
+            for part in image_content: part["image_url"]["detail"]=self.config.image_detail
         secret = None
         if self.config.api_key_env:
             secret = os.environ.get(self.config.api_key_env)
@@ -441,92 +496,137 @@ class Provider(_Journal):
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if secret:
             headers["Authorization"] = "Bearer " + secret
-        body = {**settings, "messages": [{"role": "user", "content": [{"type": "text", "text": effective_prompt}, *image_content]}], "stream": False}
-        if self.config.image_detail:
-            for part in image_content: part["image_url"]["detail"]=self.config.image_detail
-        if self.config.wire_api == "responses":
-            content=[{"type":"input_text","text":effective_prompt}]
-            for part in image_content:
-                item={"type":"input_image","image_url":part["image_url"]["url"]}
-                if self.config.image_detail:item["detail"]=self.config.image_detail
-                content.append(item)
-            body={**settings,"input":[{"role":"user","content":content}],"stream":False}
-        encoded = _json(body).encode("utf-8")
-        for attempt in range(1, self.max_retries + 2):
-            reservation = self._reserve(effective_prompt, len(images))
-            attempt_id = uuid.uuid4().hex
-            attempt_common = {**common, "attempt_id": attempt_id, "attempt_number": attempt,
-                              "live_request": True, "reserved_output_tokens": self.config.max_output_tokens,
-                              "estimated_reserved_cost_usd": reservation}
-            self._record({**attempt_common, "event": "attempt_started", "reported_usage": None,
-                          "billed_this_run_usd": None, "estimated_cost_usd": None})
-            started = time.monotonic()
-            status, raw_text, response, result, failure, transient = None, None, None, None, None, False
-            try:
-                req = request.Request(self.config.endpoint, data=encoded, headers=headers, method="POST")
-                deadline = started + self.config.timeout_s
-                if self.not_after is not None:
-                    deadline = min(deadline, self.not_after)
-                    if deadline <= started:
-                        raise TimeoutError("the run's time budget is spent; not calling the model")
+        opening = {"role": "user", "content": [{"type": "text", "text": effective_prompt}, *image_content]}
+
+        def send(conversation: list[dict[str, Any]], offer_tools: bool) -> dict[str, Any]:
+            """One request, cached and retried; the raw response, tool calls and all."""
+            identity = {"cache_version": 2, "endpoint": self.config.endpoint, "settings": settings_identity,
+                        "prompt": effective_prompt, "images": metadata, "schema": schema,
+                        "tools": list(tools) if (tools and offer_tools) else None,
+                        "conversation": conversation}
+            key = _digest(identity)
+            cache_path = self.cache_dir / (key + ".json")
+            common = {"stage": stage, "model": self.config.name, "endpoint": self.config.endpoint,
+                      "api_key_env": self.config.api_key_env, "cache_key": key,
+                      "prompt_sha256": hashlib.sha256(effective_prompt.encode()).hexdigest(), "images": metadata}
+            if cache_path.exists():
+                cached = parse_json_object(cache_path.read_text(encoding="utf-8"))
+                if cached.get("cache_key") != key or cached.get("provider_mode") != "live_api":
+                    raise InvalidResponse("Cache identity or provenance does not match")
+                self._record({**common, "event": "cache_hit", "reported_usage": None,
+                              "source_reported_usage": cached["response"].get("usage"),
+                              "estimated_cost_usd": 0.0, "billed_this_run_usd": 0.0,
+                              "live_request": False, "raw_artifact": str(cache_path)})
+                return cached["response"]
+            body = {**settings, "messages": [opening, *conversation], "stream": False}
+            if tools and offer_tools:
+                body["tools"] = list(tools)
+                body["tool_choice"] = "auto"
+                # Demanding a JSON object of a turn that may instead be a question
+                # makes the reader write its question out as JSON prose and stop.
+                # The last turn, which carries no tools, is the one held to JSON.
+                body.pop("response_format", None)
+            if self.config.wire_api == "responses":
+                content=[{"type":"input_text","text":effective_prompt}]
+                for part in image_content:
+                    item={"type":"input_image","image_url":part["image_url"]["url"]}
+                    if self.config.image_detail:item["detail"]=self.config.image_detail
+                    content.append(item)
+                body={**settings,"input":[{"role":"user","content":content}],"stream":False}
+            encoded = _json(body).encode("utf-8")
+            for attempt in range(1, self.max_retries + 2):
+                reservation = self._reserve(effective_prompt, len(images))
+                attempt_id = uuid.uuid4().hex
+                attempt_common = {**common, "attempt_id": attempt_id, "attempt_number": attempt,
+                                  "live_request": True, "reserved_output_tokens": self.config.max_output_tokens,
+                                  "estimated_reserved_cost_usd": reservation}
+                self._record({**attempt_common, "event": "attempt_started", "reported_usage": None,
+                              "billed_this_run_usd": None, "estimated_cost_usd": None})
+                started = time.monotonic()
+                status, raw_text, response, failure, transient = None, None, None, None, False
                 try:
-                    with self._opener.open(req, timeout=max(1., deadline - started)) as handle:
-                        status = handle.status
-                        raw_bytes = _read_before(handle, deadline)
-                except error.HTTPError as exc:
-                    status = exc.code
-                    raw_bytes = _read_before(exc, deadline)
-                if len(raw_bytes) > 16 * 1024 * 1024:
-                    raise InvalidResponse("HTTP response exceeds 16 MiB limit")
-                raw_text = raw_bytes.decode("utf-8", errors="replace")
-                try:
-                    response = parse_json_object(raw_text)
-                except InvalidResponse:
+                    req = request.Request(self.config.endpoint, data=encoded, headers=headers, method="POST")
+                    deadline = started + self.config.timeout_s
+                    if self.not_after is not None:
+                        deadline = min(deadline, self.not_after)
+                        if deadline <= started:
+                            raise TimeoutError("the run's time budget is spent; not calling the model")
+                    try:
+                        with self._opener.open(req, timeout=max(1., deadline - started)) as handle:
+                            status = handle.status
+                            raw_bytes = _read_before(handle, deadline)
+                    except error.HTTPError as exc:
+                        status = exc.code
+                        raw_bytes = _read_before(exc, deadline)
+                    if len(raw_bytes) > 16 * 1024 * 1024:
+                        raise InvalidResponse("HTTP response exceeds 16 MiB limit")
+                    raw_text = raw_bytes.decode("utf-8", errors="replace")
+                    try:
+                        response = parse_json_object(raw_text)
+                    except InvalidResponse:
+                        if status is not None and not 200 <= status < 300:
+                            transient = status in {408, 429, 500, 502, 503, 504}
+                            raise ProviderError(f"HTTP {status}; response was not valid JSON")
+                        raise
                     if status is not None and not 200 <= status < 300:
                         transient = status in {408, 429, 500, 502, 503, 504}
-                        raise ProviderError(f"HTTP {status}; response was not valid JSON")
-                    raise
-                if status is not None and not 200 <= status < 300:
-                    transient = status in {408, 429, 500, 502, 503, 504}
-                    raise ProviderError(f"HTTP {status}")
-                result = _response_data(response)
-            except (error.URLError, TimeoutError, ConnectionError) as exc:
-                transient = True
-                failure = ProviderError(f"Transport failure: {type(exc).__name__}")
-            except ProviderError as exc:
-                failure = exc
-            except BaseException as exc:
-                failure = exc
-            finally:
-                # Never journal headers, request bodies, data URLs, or credential values.
-                def redact(text: str) -> str:
-                    if secret:
-                        text = text.replace(secret, "[REDACTED_CREDENTIAL]")
-                    return re.sub(r"data:image/[^;\s]+;base64,[A-Za-z0-9+/=\r\n]+", "[REDACTED_IMAGE_DATA]", text)
-                safe_raw = redact(raw_text) if raw_text is not None else None
-                raw_path = self.artifact_dir / "raw" / (attempt_id + ".json")
-                _write(raw_path, {"provider_mode": "live_api", "attempt_id": attempt_id,
-                                  "http_status": status, "raw_response_text": safe_raw,
-                                  "redacted": safe_raw != raw_text})
-                usage = response.get("usage") if response else None
-                record = {**attempt_common, "event": "attempt_finished", "http_status": status,
-                          "status": "success" if failure is None else "error",
-                          "error_type": type(failure).__name__ if failure else None,
-                          "error": str(failure) if isinstance(failure, ProviderError) else None,
-                          "elapsed_s": time.monotonic() - started, "reported_usage": usage,
-                          "normalized_usage": normalize_usage(usage), "estimated_cost_usd": estimate_cost(usage, self.config.pricing),
-                          "billed_this_run_usd": None, "raw_artifact": str(raw_path),
-                          "will_retry": bool(failure and transient and attempt <= self.max_retries)}
-                self._record(parse_json_object(redact(_json(record))))
-            if failure is None:
-                # Sanitize the cache too in case an endpoint echoed credentials/images.
-                clean_response = parse_json_object(redact(_json(response)))
-                _write(cache_path, {"cache_key": key, "provider_mode": "live_api", "response": clean_response})
-                return result
-            if transient and attempt <= self.max_retries:
-                continue
-            raise failure
-        raise AssertionError("Unreachable")
+                        raise ProviderError(f"HTTP {status}")
+                    if not asked_to_measure(response):
+                        _response_data(response)
+                except (error.URLError, TimeoutError, ConnectionError) as exc:
+                    transient = True
+                    failure = ProviderError(f"Transport failure: {type(exc).__name__}")
+                except ProviderError as exc:
+                    failure = exc
+                except BaseException as exc:
+                    failure = exc
+                finally:
+                    # Never journal headers, request bodies, data URLs, or credential values.
+                    def redact(text: str) -> str:
+                        if secret:
+                            text = text.replace(secret, "[REDACTED_CREDENTIAL]")
+                        return re.sub(r"data:image/[^;\s]+;base64,[A-Za-z0-9+/=\r\n]+", "[REDACTED_IMAGE_DATA]", text)
+                    safe_raw = redact(raw_text) if raw_text is not None else None
+                    raw_path = self.artifact_dir / "raw" / (attempt_id + ".json")
+                    _write(raw_path, {"provider_mode": "live_api", "attempt_id": attempt_id,
+                                      "http_status": status, "raw_response_text": safe_raw,
+                                      "redacted": safe_raw != raw_text})
+                    usage = response.get("usage") if response else None
+                    record = {**attempt_common, "event": "attempt_finished", "http_status": status,
+                              "status": "success" if failure is None else "error",
+                              "error_type": type(failure).__name__ if failure else None,
+                              "error": str(failure) if isinstance(failure, ProviderError) else None,
+                              "elapsed_s": time.monotonic() - started, "reported_usage": usage,
+                              "normalized_usage": normalize_usage(usage), "estimated_cost_usd": estimate_cost(usage, self.config.pricing),
+                              "billed_this_run_usd": None, "raw_artifact": str(raw_path),
+                              "will_retry": bool(failure and transient and attempt <= self.max_retries)}
+                    self._record(parse_json_object(redact(_json(record))))
+                if failure is None:
+                    # Sanitize the cache too in case an endpoint echoed credentials/images.
+                    clean_response = parse_json_object(redact(_json(response)))
+                    _write(cache_path, {"cache_key": key, "provider_mode": "live_api", "response": clean_response})
+                    return clean_response
+                if transient and attempt <= self.max_retries:
+                    continue
+                raise failure
+            raise AssertionError("Unreachable")
+
+        conversation: list[dict[str, Any]] = []
+        rounds = 0
+        while True:
+            last_round = bool(tools) and rounds >= self.config.max_tool_rounds
+            response = send(conversation, offer_tools=bool(tools) and not last_round)
+            calls = asked_to_measure(response)
+            if not tools or not calls:
+                return _response_data(response)
+            rounds += 1
+            conversation.append(_asked(response))
+            for call in calls:
+                conversation.append(answer_of_a_measurement(call, tool_runner))
+            if rounds >= self.config.max_tool_rounds:
+                conversation.append({"role": "user", "content":
+                                     "That is all the measuring there is time for. Answer now with the JSON, "
+                                     "using what you measured and your best reading of the rest."})
 
 
 class ReplayProvider(_Journal):
@@ -541,7 +641,10 @@ class ReplayProvider(_Journal):
         self.response_files = tuple(Path(p) for p in response_files)
         self._position = 0
 
-    def complete(self, stage: str, prompt: str, images: Sequence[Path] = (), schema: dict[str, Any] | None = None) -> dict[str, Any]:
+    can_measure = False
+
+    def complete(self, stage: str, prompt: str, images: Sequence[Path] = (), schema: dict[str, Any] | None = None,
+                 tools: Sequence[dict[str, Any]] | None = None, tool_runner: "ToolRunner | None" = None) -> dict[str, Any]:
         if self._position >= len(self.response_files):
             raise ProviderError("Replay response files exhausted")
         source = self.response_files[self._position]
@@ -583,7 +686,10 @@ class ExchangeProvider(_Journal):
                     self._requested.add(record['cache_key'])
                     if record['event']!='external_exchange_pending':self._consumed.add(record['cache_key'])
 
-    def complete(self, stage: str, prompt: str, images: Sequence[Path] = (), schema: dict[str, Any] | None = None) -> dict[str, Any]:
+    can_measure = False
+
+    def complete(self, stage: str, prompt: str, images: Sequence[Path] = (), schema: dict[str, Any] | None = None,
+                 tools: Sequence[dict[str, Any]] | None = None, tool_runner: "ToolRunner | None" = None) -> dict[str, Any]:
         metadata, _ = _image_inputs(images)
         if schema is not None:
             parse_json_object(_json(schema))

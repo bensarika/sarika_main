@@ -16,11 +16,12 @@ from . import geometry
 from .prompts import (interpret_prompt,review_axes_prompt,review_batch_prompt,
   cross_judge_prompt,CROSS_JUDGE_SCHEMA,
   INTERPRET_SCHEMA,REVIEW_AXES_SCHEMA,REVIEW_BATCH_SCHEMA,VERSION)
-from .provider import ModelConfig,Provider,ReplayProvider,ExchangeProvider,PendingResponse
+from .provider import ModelConfig,Provider,ReplayProvider,ExchangeProvider,PendingResponse,measures
 from .audit import usage_report, export_batch
 from .calibration import recheck_packet
 from . import axis_detect
 from . import detectors
+from . import figure_tools
 from . import doc_context
 from . import gaps
 from . import duel
@@ -307,6 +308,7 @@ def run(args):
   if config.get('coordinate_grid',False):
    references.insert(0,coordinate_grid(out/'working.png',out/'coordinate_grid.png'))
    context += '\nThe blue reference grid uses the exact same pixel dimensions as image 1. Every intersection label is x,y in image 1 pixels. Use it to locate ticks and markers; do not estimate coordinates from a resized display. Read marker bodies in the original unannotated image. Grid lines are not chart data.'
+  early=None
   if config.get('detect_ticks',True):
    # Something python measured is on the canvas seconds after the upload, so the
    # wait for the first reader is a wait with the page's own geometry on screen.
@@ -345,11 +347,38 @@ def run(args):
   if config.get('detect_ticks',True) and config.get('detect_marks_without_legend',True):
    looker=threading.Thread(target=progress.bound(look_before_asking),daemon=True)
    looker.start()
-  interpret_text=interpret_prompt(*size,context,args.query)+'\nAdditional images, if any, show legend/source context. All coordinates and template boxes MUST refer to image 1.'
+  # A reader can only be handed the measurements if its endpoint carries
+  # questions back; where it cannot, it is told to answer from the image alone
+  # rather than being promised tools it will never reach.
+  measuring=bool(config.get('measuring_tools',True)) and measures(interpreter)
+  interpret_text=interpret_prompt(*size,context,args.query,measuring=measuring)+'\nAdditional images, if any, show legend/source context. All coordinates and template boxes MUST refer to image 1.'
+  def measurer(templates=None,asked=None):
+   """Python's measurements of this page, for a reader that stops to ask.
+
+   Built per call: the finders run alongside the first reading, so a reader that
+   asks late is answered with more of the page than one that asked early, and
+   neither waits on the other.
+   """
+   if not measuring or (asked is not None and not measures(asked)):return None
+   return figure_tools.FigureTools(out/'working.png',
+     plot_bbox=early_bank.get('plot_bbox'),templates=templates,
+     detected_marks=(early_bank.get('bank') or {}).get('pooled') or (),
+     ticks=early if config.get('detect_ticks',True) else None)
   def read_figure(effort=None,provider=None):
    asked=provider or interpreter
-   return asked.complete('interpret',interpret_text,
-     images=[out/'working.png']+references,schema=INTERPRET_SCHEMA)
+   tools=measurer(asked=asked)
+   reading=asked.complete('interpret',interpret_text,
+     images=[out/'working.png']+references,schema=INTERPRET_SCHEMA,
+     tools=tools.schemas() if tools else None,tool_runner=tools)
+   if tools and tools.calls:
+    progress.say('stopped to have python measure the page {n} times before answering '
+      '({m})'.format(n=len(tools.calls),
+        m=', '.join(sorted({str(c['name']) for c in tools.calls}))),
+      source=provider_label(config))
+    progress.emit('measurements_asked_for',calls=tools.calls[:60],
+      count=len(tools.calls),stage='interpret')
+    write_json(out/'measurements_asked_for_interpret.json',tools.calls)
+   return reading
   efforts=[e for e in (config.get('interpret_reasoning_efforts') or []) if e]
   if len(efforts)>1:
    readers={e:make_provider(with_reasoning_effort(config,e),out/('interpret_'+e),'model',expires) for e in efforts}
@@ -611,12 +640,21 @@ def run(args):
    crop_path=review_batches.crop(out/'working.png',batch,out/'review_batches')
    with Image.open(crop_path) as im:crop_size=im.size
    measurements=marker_screen.batch_feedback(gray,templates,batch,by_candidate) if gray is not None else None
-   jobs.append((f"review_batch_{batch['index']:03d}",
-     lambda batch=batch,crop_path=crop_path,crop_size=crop_size,measurements=measurements:reviewer.complete(
-       f"review_batch_{batch['index']:03d}",
-       review_batch_prompt(batch,labels,crop_size,context,measurements,
-         config.get('judging_provider_label')),
-       images=[crop_path],schema=REVIEW_BATCH_SCHEMA)))
+   def judge_one(batch=batch,crop_path=crop_path,crop_size=crop_size,measurements=measurements):
+    # The judge measures the same pixels the screen will hold it to, on the whole
+    # page, so a crop's edge cannot hide the mark it is deciding about.
+    tools=measurer(templates,reviewer)
+    answer=reviewer.complete(f"review_batch_{batch['index']:03d}",
+      review_batch_prompt(batch,labels,crop_size,context,measurements,
+        config.get('judging_provider_label'),measuring=bool(tools)),
+      images=[crop_path],schema=REVIEW_BATCH_SCHEMA,
+      tools=tools.schemas() if tools else None,tool_runner=tools)
+    if tools and tools.calls:
+     write_json(out/'review_batches'/f"measurements_{batch['index']:03d}.json",tools.calls)
+     progress.emit('measurements_asked_for',calls=tools.calls[:60],
+       count=len(tools.calls),stage=f"review_batch_{batch['index']:03d}")
+    return answer
+   jobs.append((f"review_batch_{batch['index']:03d}",judge_one))
   # The crops are independent of one another, so the wall clock buys as many of
   # them as the endpoint will take at once; results stay in batch order.
   missed={'decisions':[],'notes':['batch not reviewed: run time budget spent']}
