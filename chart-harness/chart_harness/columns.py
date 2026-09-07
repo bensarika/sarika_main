@@ -45,20 +45,37 @@ ARRIVE_APART_IN_PENS = 2.
 # A mark is only kept where the column has ink within this many pens of where
 # the strand says it should be.
 CONFIRM_IN_PENS = 3.
+# A stretch of ink this many pens deep in one pixel column is two curves lying
+# over one another rather than one drawn heavily.
+STRANDS_OVER_ONE_ANOTHER = 6.
 
 
-def _runs(line, most):
-    """The middles of the unbroken stretches of ink in one pixel column."""
+def _runs(line, most, doubled=None):
+    """The middles of the unbroken stretches of ink in one pixel column.
+
+    Where two curves run over one another the stretch is twice the pen wide and
+    holds two strands, not one; such a stretch is read as its two halves, so the
+    curves are still counted separately while they overlap and are picked up
+    again as themselves where they part.
+    """
     found, start = [], None
+    def close(start, stop):
+        width = stop - start
+        if width > most:
+            return
+        if doubled and width >= doubled:
+            found.append(start + width / 4.)
+            found.append(stop - 1 - width / 4.)
+        else:
+            found.append((start + stop - 1) / 2.)
     for index, on in enumerate(line):
         if on and start is None:
             start = index
         elif not on and start is not None:
-            if index - start <= most:
-                found.append((start + index - 1) / 2.)
+            close(start, index)
             start = None
-    if start is not None and len(line) - start <= most:
-        found.append((start + len(line) - 1) / 2.)
+    if start is not None:
+        close(start, len(line))
     return found
 
 
@@ -84,9 +101,10 @@ def follow(ink, first, last, pen):
     step = max(2., pen * STRAND_STEP_IN_PENS)
     blank = max(2, int((last - first) * STRAND_MAY_BE_BLANK))
     most = max(3, int(pen * 6))
+    doubled = max(4., pen * STRANDS_OVER_ONE_ANOTHER)
     live, done = [], []
     for x in range(first, last):
-        centres = _runs(ink[:, x], most)
+        centres = _runs(ink[:, x], most, doubled)
         taken = set()
         for strand in live:
             if not centres:
