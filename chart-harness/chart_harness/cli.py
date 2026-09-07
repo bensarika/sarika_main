@@ -26,6 +26,7 @@ from . import doc_context
 from . import gaps
 from . import duel
 from . import frame_fit
+from . import panel_fit
 from .consensus import compare
 from .coordinate_grid import coordinate_grid
 from .visual_check import VisualCheckProvider
@@ -933,9 +934,16 @@ Return an empty panels list if the requested figure is absent. Source evidence:
    pid=panel.get('id')
    if not isinstance(pid,str) or not pid.replace('_','').replace('-','').isalnum() or pid in used:raise ValueError('unsafe or duplicate panel ID')
    used.add(pid)
+   # A box marked on a downscaled view lands a few pixels inside the drawing and
+   # clips the rule or the last column; where it cuts ink it is moved off it.
+   panel_box,widened=panel_fit.widen(out/'oriented_page.png',native_box(panel['crop_bbox']))
+   if widened:
+    progress.say('the panel box cut through the figure; moved its edges out to blank paper by {m}px'.format(
+      m=','.join(str(v) for v in widened['moved'])),source=provider_label(config))
+    progress.emit('panel_box_widened',panel=pid,**widened)
    sub=argparse.Namespace(source=str(out/'oriented_page.png'),config=args.config,out=str(out/'panels'/pid),
       query=args.query+'; panel: '+str(panel.get('label',pid)),page=None,rotate=0,
-      crop=native_box(panel['crop_bbox']),context_file=args.context_file,reference_image=None,
+      crop=[int(v) for v in panel_box],context_file=args.context_file,reference_image=None,
       reference_images=([str(ref)] if ref else [])+[str(out/'layout_view.png')])
    progress.emit('panel',panel=pid,label=str(panel.get('label',pid)),state='started')
    r=run(sub)
