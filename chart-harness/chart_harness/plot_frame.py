@@ -64,6 +64,23 @@ def _rules(mask, along):
             for group in grouped]
 
 
+def _meeting(across, upright):
+    """The rules that meet another rule crossways: the ones forming a corner.
+
+    A figure prints straight rules that are not the plot's frame - the arrow
+    under a forest plot, a rule under a caption - and they give themselves away
+    by standing alone. Where rules do cross, only the crossing ones are believed;
+    where none do, all of them are kept, since a lone axis is still an axis.
+    """
+    if not across or not upright:
+        return across, upright
+    def crosses(one, other):
+        return other[1] <= one[0] <= other[2] and one[1] <= other[0] <= one[2]
+    kept_across = [a for a in across if any(crosses(a, u) for u in upright)]
+    kept_upright = [u for u in upright if any(crosses(u, a) for a in across)]
+    return kept_across or across, kept_upright or upright
+
+
 def frame(image_path, mask=None):
     """The box the plot is drawn in, measured from its rules.
 
@@ -75,6 +92,7 @@ def frame(image_path, mask=None):
     upright = _rules(mask, 'cols')
     if not across and not upright:
         return None
+    across, upright = _meeting(across, upright)
     top = bottom = left = right = None
     if across:
         top, bottom = across[0][0], across[-1][0]

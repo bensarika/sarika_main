@@ -47,6 +47,12 @@ STAMP_SOLIDITY = .5
 # than the figure's own strokes do. A line cannot reach that on its own, not even
 # where it doubles back on itself; a stamp printed on the line does.
 SWELL_IN_STROKES = 3.
+# The swollen core of a mark - the part standing that clear of the paper - is
+# only the middle of it, and on a small marker drawn with a heavy line that is a
+# few pixels across. So the core is asked to be this many strokes wide, not the
+# whole mark's width; what keeps a corner of a curve out is that a corner does
+# not stand three strokes clear in the first place.
+SWELL_ACROSS_IN_STROKES = 3.
 # Two marks printed over each other are told apart when their middles stand this
 # much of a stamp's width away; a clump wider than this many stamps is a drawing,
 # not a few marks that happen to overlap.
@@ -282,7 +288,7 @@ def stroke_clearance(clearance, ink):
     return float(np.median(clearance[ridge])) if ridge.any() else None
 
 
-def swellings(ink, offset, lifted=None):
+def swellings(ink, offset, lifted=None, stamp=None):
     """Marks drawn onto a curve: where the ink stands clear of the paper.
 
     A stroke is everywhere one pen wide, so its middle stands a fixed distance
@@ -302,31 +308,57 @@ def swellings(ink, offset, lifted=None):
         return []
     labelled, count = ndimage.label(swollen, structure=np.ones((3, 3), bool))
     found = []
-    across = stroke * SWELL_IN_STROKES * 2
+    across = stroke * SWELL_ACROSS_IN_STROKES
     for index, (rows, columns) in enumerate(ndimage.find_objects(labelled), start=1):
         patch = labelled[rows, columns] == index
         # A mark that stands three strokes clear of the paper is at least six
         # strokes across; a shorter thick spot is a corner of the curve itself.
         if max(columns.stop - columns.start, rows.stop - rows.start) < across:
             continue
-        # Where a gridline was rejoined to the curve crossing it, the join is
-        # thick for the same reason a mark is, so a thick spot standing on a rule
-        # is not read as a mark. A mark that happens to sit on a gridline is read
-        # as an island instead, once the rule is lifted off it.
-        if lifted is not None and (patch & lifted[rows, columns]).any():
-            continue
+        size = float(max(columns.stop - columns.start, rows.stop - rows.start))
         ys, xs = np.nonzero(patch)
         found.append({'x': offset[0] + columns.start + float(xs.mean()),
                       'y': offset[1] + rows.start + float(ys.mean()),
                       'width': float(columns.stop - columns.start),
                       'height': float(rows.stop - rows.start),
-                      'size': float(max(columns.stop - columns.start,
-                                        rows.stop - rows.start)),
-                      'area': int(patch.sum()), 'method': 'swell'})
+                      'size': size,
+                      'area': int(patch.sum()), 'method': 'swell',
+                      'on_a_rule': bool(lifted is not None
+                                        and (patch & lifted[rows, columns]).any())})
+    # Where a gridline was rejoined to the curve crossing it, the join is thick
+    # for the same reason a mark is, so a thick spot standing on a rule is not
+    # read as a mark - unless it is the size the figure's other marks are, which
+    # a join of two strokes is not. That is how a mark printed on a reference
+    # line is kept without keeping every crossing on the plate.
+    clear = [mark for mark in found if not mark['on_a_rule']]
+    sizes = [mark['size'] for mark in clear]
+    # The size is only worth comparing against where the figure has printed the
+    # same mark in the open several times over: a couple of stray thick spots of
+    # differing sizes describe nothing, and taking a rule crossing for one of
+    # them would put marks on a plate that draws none.
+    settled = (len(clear) >= STAMPS_SEEN
+               and max(sizes) - min(sizes) <= SAME_STAMP * float(np.median(sizes)))
+    typical = stamp or (float(np.median(sizes)) if settled else None)
+    kept = [mark for mark in found
+            if not mark['on_a_rule']
+            or (typical is not None
+                and abs(mark['size'] - typical) <= SAME_STAMP * typical)]
+    for mark in kept:
+        mark.pop('on_a_rule', None)
+    # A curve that doubles back on itself, or two curves that touch, swell the
+    # ink as well, and what tells those apart from marks is that they are each a
+    # different size while a stamp is one size printed over and over. So where
+    # the figure has not already said what its stamp is, the size that repeats is
+    # taken to be it and the odd swellings out are left alone.
+    if stamp is None and len(kept) >= STAMPS_SEEN:
+        usual = float(np.median([mark['size'] for mark in kept]))
+        agreeing = [mark for mark in kept
+                    if abs(mark['size'] - usual) <= SAME_STAMP * usual]
+        kept = agreeing if len(agreeing) >= STAMPS_SEEN else []
     # One thick spot is a line doubling back on itself; a plot's marks come in
     # numbers. Sizes are not compared here because a legend of six shapes prints
     # six different swellings, all of them marks.
-    return found if len(found) >= STAMPS_SEEN else []
+    return kept if len(kept) >= STAMPS_SEEN else []
 
 
 def gathered(swollen, apart):
@@ -410,7 +442,7 @@ def in_ink(ink, offset):
     # Thick spots belonging to one mark stand within the mark's own width of each
     # other. Where the figure prints a stamp somewhere, that width is known; where
     # it does not, the pen says how wide a mark has to be to swell at all.
-    joined = gathered(swellings(bare, offset, lifted),
+    joined = gathered(swellings(bare, offset, lifted, stamp),
                       stamp / 2. if stamp else max(3., (pen or 1.) * 3.))
     # A mark found both ways is one mark: the swelling inside an island is that
     # island, so islands win where the two coincide.
