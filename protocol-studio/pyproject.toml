@@ -29,6 +29,7 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
     "types-jsonschema",
+    "types-openpyxl",
 ]
 
 [tool.ruff]

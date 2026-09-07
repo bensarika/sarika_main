@@ -36,5 +36,10 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:5173"]
 
+    # Evidence corpus (ADR-015/017): read-only S3 prefix holding FDA reviews, protocols, SAPs.
+    aws_region: str = "us-east-2"
+    corpus_s3_uri: str = "s3://sarika-main-fs/protocol-corpus/"
+    upload_max_bytes: int = 60 * 1024 * 1024
+
 
 settings = Settings()

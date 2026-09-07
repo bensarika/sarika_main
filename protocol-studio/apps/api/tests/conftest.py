@@ -30,6 +30,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
     import protocol_studio.api.admin as ad
     import protocol_studio.api.ai as ai
     import protocol_studio.api.collab as co
+    import protocol_studio.api.evidence as ev
     import protocol_studio.api.library as lib
     import protocol_studio.api.providers as pv
     import protocol_studio.api.trial_lab as tl
@@ -37,10 +38,12 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
     import protocol_studio.api.works as ws
     import protocol_studio.auth.routes as ar
     import protocol_studio.engine.export as ex
+    import protocol_studio.evidence.connections as evc
+    import protocol_studio.evidence.master as evm
     import protocol_studio.llm.gateway as gw
     import protocol_studio.main as main
 
-    for m in (ar, ex, ws, vs, ad, lib, gw, co, tl, ai, pv, main):
+    for m in (ar, ex, ws, vs, ad, lib, gw, co, tl, ai, pv, evm, evc, ev, main):
         importlib.reload(m)
     with TestClient(main.app) as c:
         yield c

@@ -252,6 +252,36 @@ class SourceRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class StudyRecordRow(Base):
+    """A user-added canonical study record (seeded ones live in reference/evidence/). ``canonical`` is a StudyRecord."""
+
+    __tablename__ = "study_records"
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    indication: Mapped[str] = mapped_column(String(120), index=True)
+    canonical: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(16), default="review")  # review | approved
+    source_id: Mapped[str | None] = mapped_column(ForeignKey("source_records.id"), nullable=True)
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SourceConnection(Base):
+    """A linked folder (S3 prefix or Dropbox link) whose files are registered as SourceRecords on sync."""
+
+    __tablename__ = "source_connections"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16))  # s3 | dropbox
+    uri: Mapped[str] = mapped_column(Text)
+    scope: Mapped[str] = mapped_column(String(16), default="workspace")  # workspace | study
+    work_id: Mapped[str | None] = mapped_column(ForeignKey("works.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(24), default="unchecked")  # unchecked | ok | error | not_configured
+    detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class AuditEvent(Base):
     __tablename__ = "audit_events"
     id: Mapped[int] = mapped_column(primary_key=True)
