@@ -32,7 +32,7 @@ class CLITests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def provider(self,config,out,role):
+    def provider(self,config,out,role,not_after=None):
         parent=self
         class Fixture:
             def complete(self,stage,prompt,images=(),schema=None):

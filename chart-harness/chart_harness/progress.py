@@ -43,6 +43,19 @@ def bound(function):
     return run
 
 
+def say(text, source='harness'):
+    """A sentence about what is happening, for a person watching the run.
+
+    Stage events say which stage ran; they do not say what the reader concluded
+    or what the pixels showed, and a watcher staring at a spinner has no way to
+    tell a slow call from a stuck one. This carries the readers' own words and
+    the harness's measurements in plain language, alongside the machine events
+    rather than instead of them.
+    """
+    if text:
+        emit('say', text=str(text)[:600], source=source)
+
+
 def emit(kind, **fields):
     """Report that something happened. Never raises into the pipeline."""
     sink = _sink.get()

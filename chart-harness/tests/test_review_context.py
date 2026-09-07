@@ -18,7 +18,7 @@ class ReviewContextTest(unittest.TestCase):
             (root/'context.txt').write_text('Neutral protocol excerpt: observed circles and predicted line.')
             axis={'scale':'linear','unit':'h','anchors':[{'pixel':10,'value':0},{'pixel':90,'value':8}]}
             seen={}
-            def factory(config,out,role):
+            def factory(config,out,role,not_after=None):
                 class Stub:
                     def complete(self,stage,prompt,images=(),schema=None):
                         seen[stage]=prompt

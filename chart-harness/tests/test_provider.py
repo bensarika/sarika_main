@@ -98,6 +98,27 @@ class ProviderTests(unittest.TestCase):
             self.assertLess(time.monotonic() - started, 20)
         self.assertIn("Transport failure", str(caught.exception))
 
+    def test_a_call_cannot_outlive_the_runs_own_clock(self):
+        # The per-call timeout is generous on purpose; the run's budget is not, and
+        # a reader still talking when the run is over is of no use to it.
+        stop = threading.Event()
+        self.addCleanup(stop.set)
+        with dribbling_server(stop) as url:
+            provider = Provider(ModelConfig("arbitrary/user-model", url, timeout_s=600), self.root)
+            provider.not_after = time.monotonic() + 1
+            started = time.monotonic()
+            with self.assertRaises(ProviderError):
+                provider.complete("interpret", "prompt")
+            self.assertLess(time.monotonic() - started, 20)
+
+    def test_a_spent_budget_stops_the_request_before_it_is_sent(self):
+        with stub_server([(200, completion())]) as (url, calls):
+            provider = Provider(ModelConfig("arbitrary/user-model", url), self.root)
+            provider.not_after = time.monotonic() - 1
+            with self.assertRaises(ProviderError):
+                provider.complete("interpret", "prompt")
+            self.assertEqual([], calls)
+
     def test_reasoning_effort_is_sent_and_changes_cache_identity(self):
         with tempfile.TemporaryDirectory() as directory:
             with stub_server([(200, completion()), (200, completion())]) as (url, calls):

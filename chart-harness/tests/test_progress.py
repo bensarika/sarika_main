@@ -22,5 +22,35 @@ class Threads(unittest.TestCase):
         self.assertEqual([], seen)
 
 
+class Sentences(unittest.TestCase):
+    """A watcher is told what is happening, not only which stage is running."""
+
+    def test_a_sentence_carries_who_said_it(self):
+        seen = []
+        with progress.listening(seen.append):
+            progress.say('reads this as three series', source='grok')
+        self.assertEqual([('say', 'reads this as three series', 'grok')],
+                         [(e['kind'], e['text'], e['source']) for e in seen])
+
+    def test_the_harness_speaks_for_itself_by_default(self):
+        seen = []
+        with progress.listening(seen.append):
+            progress.say('measured 7 ticks across')
+        self.assertEqual('harness', seen[0]['source'])
+
+    def test_nothing_is_said_when_there_is_nothing_to_say(self):
+        seen = []
+        with progress.listening(seen.append):
+            progress.say('')
+            progress.say(None)
+        self.assertEqual([], seen)
+
+    def test_a_long_sentence_is_cut_rather_than_flooding_the_watcher(self):
+        seen = []
+        with progress.listening(seen.append):
+            progress.say('x' * 5000)
+        self.assertEqual(600, len(seen[0]['text']))
+
+
 if __name__ == '__main__':
     unittest.main()

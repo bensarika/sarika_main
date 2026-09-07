@@ -346,6 +346,12 @@ class Provider(_Journal):
         if max_retries not in (0, 1) or isinstance(max_retries, bool):
             raise ValueError("max_retries must be 0 (default) or 1")
         self.max_retries = max_retries
+        # A run has a wall clock of its own, and a call that would outlive it is of
+        # no use to the run that asked for it. The harness sets this to the moment
+        # the run's budget expires; a call is then bounded by whichever of its own
+        # timeout and that moment comes first, and one with no time left never
+        # leaves the machine.
+        self.not_after: float | None = None
         for name, value in (("max_calls", max_calls), ("max_reserved_output_tokens", max_reserved_output_tokens)):
             if value is not None and (type(value) is not int or value < 0):
                 raise ValueError(f"{name} must be a nonnegative integer")
@@ -459,8 +465,12 @@ class Provider(_Journal):
             try:
                 req = request.Request(self.config.endpoint, data=encoded, headers=headers, method="POST")
                 deadline = started + self.config.timeout_s
+                if self.not_after is not None:
+                    deadline = min(deadline, self.not_after)
+                    if deadline <= started:
+                        raise TimeoutError("the run's time budget is spent; not calling the model")
                 try:
-                    with self._opener.open(req, timeout=self.config.timeout_s) as handle:
+                    with self._opener.open(req, timeout=max(1., deadline - started)) as handle:
                         status = handle.status
                         raw_bytes = _read_before(handle, deadline)
                 except error.HTTPError as exc:

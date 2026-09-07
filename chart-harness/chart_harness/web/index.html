@@ -50,6 +50,10 @@
  .bar.fail i{animation:none;width:100%;background:#da3633}
  @keyframes slide{from{left:-35%}to{left:100%}}
  .elapsed{padding:3px 12px;font-size:11px;color:#8b949e;display:flex;justify-content:space-between}
+ .feed{padding:4px 12px 8px;font-size:11px;color:#adbac7;max-height:132px;overflow:auto;border-top:1px solid #1c1f25}
+ .feed div{padding:1px 0;white-space:normal}
+ .feed .who{color:#6e7681}
+ .feed .fresh{color:#e3e8ef}
  .say{display:flex;gap:6px;padding:8px 12px;border-top:1px solid #1c1f25}
  .say input{flex:1;min-width:0}
  .notes{padding:0 12px 8px;font-size:11px;color:#9aa4b1}
@@ -70,7 +74,7 @@
 <footer><section id="adjudication" hidden><h2>adjudication <span class="status" id="agree"></span></h2></section></footer>
 <script>
 const $ = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x !== undefined) e.textContent = x; return e; };
-let runId = null, uploaded = null, sideNames = [];
+let runId = null, uploaded = null, sideNames = [], uploadedAt = null;
 const panels = new Map();
 const COLOUR = { observed: '#13a34a', reject: '#e63563', unresolved: '#e3a413',
                  candidate: '#1f6feb', mark: '#8957e5', crowded: '#e3a413' };
@@ -235,7 +239,10 @@ function panel(side) {
   const root = $('section');
   const head = $('h2'); head.append($('span', null, side));
   const status = $('span', 'status', 'waiting');
-  head.append(status); root.append(head);
+  // The clock runs from the upload, not from whenever this pane was built, so
+  // both sides report the same age for the same figure.
+  const since = $('span', 'status', '');
+  head.append(status, since); root.append(head);
   const bar = $('div', 'bar'); bar.append($('i')); root.append(bar);
   const view = $('div', 'view'); root.append(view);
   const v = viewer(view);
@@ -257,6 +264,11 @@ function panel(side) {
   const stagepane = $('div', 'stagepane'); root.append(stagepane);
   const elapsed = $('div', 'elapsed'); const clock = $('span', null, '0s');
   const calls = $('span', null, ''); elapsed.append(clock, calls); root.append(elapsed);
+  // What is going on, in words: the readers' own sentences and the harness's
+  // measurements, so a long stage reads as work rather than as a hang.
+  const feed = $('div', 'feed');
+  feed.append($('div', null, 'waiting for the first reading…'));
+  root.append(feed);
   const blocks = {};
   for (const [key, title] of [['legend', 'legend'], ['glyphs', 'legend glyphs (templates python searches for)'],
        ['marks', 'marks measured out of the plot (no legend)'],
@@ -288,8 +300,24 @@ function panel(side) {
 
   sides.append(root);
   const started = Date.now();
-  const p = { root, status, blocks, chips: new Map(), bar, notes, stages: 0, view: v, stagepane };
-  p.tick = setInterval(() => { clock.textContent = Math.round((Date.now() - started) / 1000) + 's'; }, 1000);
+  const p = { root, status, blocks, chips: new Map(), bar, notes, stages: 0, view: v, stagepane, feed };
+  p.say = (text, who) => {
+    if (!text) return;
+    if (p.feed.firstChild && p.feed.firstChild.dataset.placeholder) p.feed.replaceChildren();
+    for (const line of p.feed.children) line.className = '';
+    const line = $('div', 'fresh');
+    line.append($('span', 'who', clock.textContent + ' · ' + (who || 'harness') + ': '),
+      document.createTextNode(text));
+    p.feed.append(line);
+    while (p.feed.children.length > 60) p.feed.firstChild.remove();
+    p.feed.scrollTop = p.feed.scrollHeight;
+  };
+  feed.firstChild.dataset.placeholder = '1';
+  p.tick = setInterval(() => {
+    const seconds = Math.round((Date.now() - (uploadedAt || started)) / 1000);
+    clock.textContent = seconds + 's';
+    since.textContent = seconds + 's since upload';
+  }, 1000);
   p.finish = state => { clearInterval(p.tick); bar.className = 'bar ' + state; };
   p.counted = () => { calls.textContent = p.stages + ' stages'; };
   if (uploaded) v.load(uploaded);
@@ -332,9 +360,20 @@ const render = {
     chip.title = e.reason || '';
     p.stages = p.chips.size; p.counted();
     p.status.textContent = e.state === 'started' ? e.stage + '…' : p.status.textContent;
+    p.say({ started: 'started ' + e.stage,
+            finished: 'finished ' + e.stage + (e.seconds ? ' in ' + e.seconds + 's' : ''),
+            reused: e.stage + ' reused from the earlier run',
+            skipped: e.stage + ' skipped — ' + (e.reason || 'time budget') }[e.state]);
   },
-  panel(p, e) { p.status.textContent = 'panel ' + e.label + ' ' + e.state + (e.status ? ' — ' + e.status : ''); },
-  reorient(p, e) { p.status.textContent = 'sheet printed sideways — rotating ' + e.clockwise + '°'; },
+  say(p, e) { p.say(e.text, e.source); },
+  panel(p, e) {
+    p.status.textContent = 'panel ' + e.label + ' ' + e.state + (e.status ? ' — ' + e.status : '');
+    p.say('panel ' + e.label + ' ' + e.state + (e.status ? ' — ' + e.status : ''));
+  },
+  reorient(p, e) {
+    p.status.textContent = 'sheet printed sideways — rotating ' + e.clockwise + '°';
+    p.say('the sheet is printed sideways, rotating it ' + e.clockwise + '°');
+  },
   image(p, e) { p.view.load(url(e.path)); },
   axes(p, e) {
     p.view.plot = e.plot_bbox;
@@ -365,12 +404,19 @@ const render = {
   detected_marks(p, e) {
     // No legend: python locates the marks by ink thickness, and a crowded body is
     // several marks printed over one another rather than one reading.
+    p.say(e.count
+      ? `${e.measured_only ? 'python looked for the marks before any reader answered' :
+           'no legend to copy a marker from, so python looked for the marks itself'}: ${e.count} bodies `
+        + `(${Object.entries(e.counts_by_method || {}).map(([k, v]) => k + ' ' + v).join(', ')})`
+        + `, ${e.corroborated} found by more than one method`
+      : 'no finder located a mark-shaped body in the plot');
     p.view.marks = e.marks || [];
     if (e.plot_bbox) p.view.plot = e.plot_bbox;
     p.view.draw();
     const wrap = $('div');
     wrap.append($('div', null, e.count
-      ? `${e.count} ink bodies · about ${e.marks_suggested} marks · ${e.crowded} crowded`
+      ? `${e.count} ink bodies` + (e.marks_suggested == null ? '' : ` · about ${e.marks_suggested} marks`)
+        + (e.crowded == null ? '' : ` · ${e.crowded} crowded`)
       : 'none'));
     wrap.append($('div', null, e.reason || ''));
     show(p, 'marks', wrap);
@@ -392,6 +438,19 @@ const render = {
     const wrap = $('div'); wrap.append($('div', null, e.count + ' candidates'), s);
     show(p, 'candidates', wrap);
     if (e.overlay) version(p, 'proposed points', e.overlay, e.count + ' candidates proposed');
+  },
+  reviewed_batch(p, e) {
+    // Each crop's verdicts land on the figure as that call returns, so the
+    // reading builds up in front of the watcher instead of appearing at the end.
+    p.status.textContent = `reviewing crops ${e.done}/${e.of}`;
+    for (const d of e.decisions || []) {
+      if (!d.candidate_id) continue;
+      const row = { candidate_id: d.candidate_id, series_id: d.series_id, status: d.role,
+                    reason: d.reason, pixel_x: d.pixel_x, pixel_y: d.pixel_y };
+      const at = p.view.rows.findIndex(r => r.candidate_id === d.candidate_id);
+      if (at >= 0) p.view.rows[at] = row; else p.view.rows.push(row);
+    }
+    p.view.draw();
   },
   screen(p, e) {
     for (const r of e.results) p.view.screen.set(r.candidate_id, r);
@@ -459,6 +518,8 @@ const render = {
   },
   failed(p, e) {
     p.status.textContent = 'failed';
+    p.say('failed: ' + e.error);
+    clearInterval(p.tick);
     p.finish('fail');
     const pre = document.createElement('pre'); pre.textContent = e.error + '\n' + (e.detail || '');
     show(p, 'result', pre);
@@ -471,20 +532,38 @@ function row(cell, values) {
   return tr;
 }
 
+function everyone(text, who) { for (const p of panels.values()) p.say(text, who); }
+
 function handle(e) {
-  if (e.kind === 'run_started') { banner.textContent = 'run ' + e.run; e.sides.forEach(panel); return; }
+  if (e.kind === 'run_started') {
+    banner.textContent = 'run ' + e.run;
+    e.sides.forEach(panel);
+    everyone('the figure is uploaded; both readers are being called on it now');
+    return;
+  }
   if (e.kind === 'run_finished') {
     banner.textContent = 'done — ' + JSON.stringify(e.statuses);
-    for (const p of panels.values()) if (p.bar.className === 'bar') p.finish('done');
+    everyone('run finished — ' + Object.entries(e.statuses || {}).map(([k, v]) => k + ' ' + v).join(', '));
+    // The clocks stop where the run stopped, so the total stays on screen.
+    for (const p of panels.values()) { clearInterval(p.tick); if (p.bar.className === 'bar') p.finish('done'); }
     return;
   }
   if (e.kind === 'duel_report') {
     adjudication.hidden = false;
+    everyone((e.agrees ? 'the two readings agree with each other' : 'the two readings disagree')
+      + (e.iterated.length ? '; second pass for ' + e.iterated.join(', ') : ''), 'adjudication');
     agree.textContent = (e.agrees ? 'readings agree (evidence, not proof)' : 'readings disagree — see duel_report.json')
       + (e.iterated.length ? ' · second pass: ' + e.iterated.join(', ') : '');
     return;
   }
-  if (!e.side || e.side === 'both') { if (e.kind === 'stage') banner.textContent = 'cross-judging: ' + e.stage + ' ' + e.state; return; }
+  if (!e.side || e.side === 'both') {
+    if (e.kind === 'stage') {
+      banner.textContent = 'cross-judging: ' + e.stage + ' ' + e.state;
+      everyone(e.stage + ' ' + e.state, 'adjudication');
+    }
+    if (e.kind === 'say') everyone(e.text, e.source);
+    return;
+  }
   const p = panel(e.side);
   if (render[e.kind]) render[e.kind](p, e);
 }
@@ -496,6 +575,7 @@ file.onchange = () => {
   if (!f) return;
   if (uploaded) URL.revokeObjectURL(uploaded);
   uploaded = /\.pdf$/i.test(f.name) ? null : URL.createObjectURL(f);
+  uploadedAt = Date.now();
   sides.replaceChildren(); panels.clear();
   for (const side of sideNames) panel(side);
   banner.textContent = uploaded ? f.name + ' — press read it' : f.name + ' — pdf page renders once the run starts';
@@ -505,6 +585,7 @@ go.onclick = async () => {
   const f = file.files[0];
   if (!f) { banner.textContent = 'choose a file first'; return; }
   go.disabled = true; adjudication.hidden = true;
+  uploadedAt = uploadedAt || Date.now();
   if (!panels.size) for (const side of sideNames) panel(side);
   const q = new URLSearchParams({ filename: f.name, query: query.value });
   if (page.value) q.set('page', page.value);
