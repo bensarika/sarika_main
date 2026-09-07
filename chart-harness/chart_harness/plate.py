@@ -16,6 +16,7 @@ buried in the count.
 """
 from . import columns
 from . import glyphs
+from . import lettering
 
 # A column reading is only taken where the columns are shared by this many
 # curves at once: that is what a sampling time looks like. One or two strands
@@ -23,9 +24,22 @@ from . import glyphs
 SHARED_BY = 3
 
 
+def _off_the_writing(reading, written):
+    """The same reading with anything standing in a letter dropped.
+
+    A note written inside the plot is small dark shapes in open paper, which is
+    what a marker is; only the way it is set tells them apart, so the writing is
+    found once and taken off whichever reading the figure calls for.
+    """
+    kept = lettering.clear_of(reading['marks'], written)
+    return dict(reading, marks=kept,
+                written_over=len(reading['marks']) - len(kept))
+
+
 def marks(image_path, plot_bbox):
     """The marks of a figure, read as the figure draws them."""
-    stamped = glyphs.find(image_path, plot_bbox)
+    written = lettering.blocks(image_path, plot_bbox)
+    stamped = _off_the_writing(glyphs.find(image_path, plot_bbox), written)
     # A plate of curves that also stamps a glyph at every sampling time stacks
     # those glyphs into columns welded by their error bars, and reading them as
     # free-standing stamps picks up the welds. Where the figure draws curves and
@@ -35,7 +49,7 @@ def marks(image_path, plot_bbox):
              else SHARED_BY)
     if stamped['marks'] and stamped['stamp_px'] and drawn < SHARED_BY:
         return dict(stamped, drawn_as='a stamp per observation')
-    sampled = columns.read(image_path, plot_bbox)
+    sampled = _off_the_writing(columns.read(image_path, plot_bbox), written)
     if (drawn >= SHARED_BY and sampled['series'] >= SHARED_BY
             and sampled['marks']):
         return dict(sampled, drawn_as='series sampled in shared columns',
