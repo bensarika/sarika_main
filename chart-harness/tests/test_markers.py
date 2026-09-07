@@ -185,6 +185,76 @@ class Screen(unittest.TestCase):
                                           'possible_series': ['s1']}}))
 
 
+class EmptyCircles(unittest.TestCase):
+    """A ring drawn around nothing is not the filled mark the legend shows."""
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+        self.image = chart(self.dir / 'chart.png')
+        self.gray = markers.load_gray(self.image)
+        self.template = markers.legend_glyphs(self.gray, PLOT, 3)[0]['glyph_bbox']
+        image = Image.open(self.image)
+        draw = ImageDraw.Draw(image)
+        # Same size and rim as a mark, hollow inside.
+        self.ring = (300, 320)
+        draw.ellipse((self.ring[0] - 7, self.ring[1] - 7,
+                      self.ring[0] + 7, self.ring[1] + 7), outline='black', width=4)
+        image.save(self.image)
+        self.gray = markers.load_gray(self.image)
+
+    def test_a_hollow_window_fails_where_the_glyph_is_solid(self):
+        report = markers.patch_report(self.gray, self.template, *self.ring)
+        self.assertLess(report['core_ink_fraction'],
+                        report['template_core_ink_fraction'])
+        verdict = markers.verdict(report)
+        self.assertFalse(verdict['passed'])
+        self.assertEqual('window_middle_is_empty_where_the_glyph_is_solid',
+                         verdict['reason'])
+
+    def test_the_real_filled_mark_still_passes(self):
+        report = markers.patch_report(self.gray, self.template, *MARKS[0])
+        self.assertTrue(markers.verdict(report)['passed'])
+
+
+class WholeReadingOffset(unittest.TestCase):
+    """A reader that reads every point high is displaced, not four times unlucky."""
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+        self.image = chart(self.dir / 'chart.png')
+        self.gray = markers.load_gray(self.image)
+        self.template = markers.legend_glyphs(self.gray, PLOT, 3)[0]['glyph_bbox']
+
+    def screen(self, lift):
+        proposals = {'candidates': [
+            {'candidate_id': f'c{i}', 'pixel': {'x': float(x), 'y': float(y - lift)},
+             'possible_series': ['s1']} for i, (x, y) in enumerate(MARKS)]}
+        review = {'status': 'accepted', 'decisions': [
+            {'candidate_id': f'c{i}', 'series_id': 's1', 'role': 'observed'}
+            for i in range(len(MARKS))]}
+        screens = marker_screen.apply(self.image, interpretation(self.template),
+                                      proposals, review, snap_limit_px=0.)
+        return proposals, review, screens
+
+    def test_points_all_read_high_are_reported_as_one_displacement(self):
+        _, review, _ = self.screen(12)
+        offset = review['systematic_offset']
+        self.assertAlmostEqual(12, offset['dy'], delta=3)
+        self.assertGreaterEqual(offset['axes']['dy']['share_agreeing'], .6)
+        self.assertIn('below the reading', offset['reading'])
+
+    def test_the_displacement_is_taken_off_and_the_points_land_on_the_marks(self):
+        proposals, review, _ = self.screen(12)
+        self.assertTrue(review['systematic_offset']['recovered'])
+        for candidate, (x, y) in zip(proposals['candidates'], MARKS):
+            self.assertAlmostEqual(y, candidate['pixel']['y'], delta=4)
+        self.assertTrue(all(d['role'] == 'observed' for d in review['decisions']))
+
+    def test_points_already_on_the_marks_report_no_displacement(self):
+        _, review, _ = self.screen(0)
+        self.assertNotIn('systematic_offset', review)
+
+
 class MinedTemplates(unittest.TestCase):
     """A figure can carry no legend at all; the marks are still measurable."""
 

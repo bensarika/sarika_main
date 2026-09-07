@@ -5,6 +5,8 @@ an observation where the window holds no matching ink is demoted here, in
 Python, before calibration turns pixels into numbers; the reader is told by how
 many pixels and in which direction it was wrong, from the same measurement.
 """
+import statistics
+
 from . import markers
 
 
@@ -63,11 +65,100 @@ def _glyph_ink(gray, template_bbox):
 # read slightly off centre, while a longer one is a different mark. The glyph is
 # cut from this figure's own legend, so the limit follows the figure's scale.
 SNAP_LIMIT_IN_GLYPHS = 1.
+# A reader that reads one point high has read them all high: the same eye made
+# every guess. An offset shared by this share of the points, in the same
+# direction and bigger than this much of a glyph, is the reader's bias rather
+# than a scatter of small misses, and it is worth taking off all of them.
+BIAS_AGREEMENT_FRACTION = .6
+BIAS_SIZE_IN_GLYPHS = .25
+BIAS_MINIMUM_POINTS = 4
+
+
+def systematic_offset(screens, glyph_size):
+    """The offset the whole reading is out by, where its misses all lean one way.
+
+    Each point's distance to the nearest matching window is already measured. If
+    most of those distances point the same way and are bigger than a quarter of
+    a glyph, the reading is displaced as a whole - the thing to say about a
+    reader whose points all sit above the marks - and the shift is measured, not
+    guessed at.
+    """
+    offsets = [e['offset_to_nearest_match'] for e in screens
+               if e.get('offset_to_nearest_match')]
+    if len(offsets) < BIAS_MINIMUM_POINTS or not glyph_size:
+        return None
+    found = {}
+    for axis in ('dx', 'dy'):
+        deltas = [o[axis] for o in offsets]
+        middle = float(statistics.median(deltas))
+        if abs(middle) < glyph_size * BIAS_SIZE_IN_GLYPHS:
+            continue
+        agreeing = sum(1 for d in deltas if d * middle > 0) / len(deltas)
+        if agreeing < BIAS_AGREEMENT_FRACTION:
+            continue
+        found[axis] = {'median_px': middle, 'share_agreeing': round(agreeing, 2)}
+    if not found:
+        return None
+    direction = []
+    if 'dx' in found:
+        direction.append('right' if found['dx']['median_px'] > 0 else 'left')
+    if 'dy' in found:
+        direction.append('below' if found['dy']['median_px'] > 0 else 'above')
+    return {'dx': found.get('dx', {}).get('median_px', 0.),
+            'dy': found.get('dy', {}).get('median_px', 0.),
+            'points_measured': len(offsets),
+            'axes': found, 'glyph_size_px': glyph_size,
+            'basis': 'median distance from each point to the window that matches its glyph',
+            'reading': 'the marks lie {d} the reading, by {x:.0f}px across and {y:.0f}px up '
+                       'or down'.format(d=' and '.join(direction),
+                                        x=abs(found.get('dx', {}).get('median_px', 0.)),
+                                        y=abs(found.get('dy', {}).get('median_px', 0.)))}
 
 
 def _glyph_size(template_bbox):
     box = [float(v) for v in template_bbox]
     return max(box[2] - box[0], box[3] - box[1])
+
+
+def _take_off_the_bias(gray, templates, by_id, review, screens, bias, threshold,
+                       min_ink_ratio):
+    """Move the points the whole reading missed by, where the move lands on ink.
+
+    Only a point that failed on its own pixels is moved, and only if the shifted
+    window then passes the same check every other point had to pass. A demotion
+    that survives the correction stays a demotion.
+    """
+    recovered = []
+    by_candidate = {e['candidate_id']: e for e in screens}
+    for decision in review.get('decisions', []):
+        entry = by_candidate.get(decision.get('candidate_id'))
+        if entry is None or entry.get('passed') or entry.get('corrected'):
+            continue
+        candidate = by_id.get(decision.get('candidate_id'))
+        template = templates.get(entry['series_id'])
+        if candidate is None or template is None:
+            continue
+        x = candidate['pixel']['x'] + bias['dx']
+        y = candidate['pixel']['y'] + bias['dy']
+        moved = markers.patch_report(gray, template, x, y)
+        recheck = markers.verdict(moved, min_ncc=threshold, min_ink_ratio=min_ink_ratio)
+        if not recheck['passed']:
+            continue
+        was = dict(candidate['pixel'])
+        candidate['pixel'] = {'x': x, 'y': y}
+        candidate.setdefault('diagnostics', {})['moved_by_the_readings_own_offset'] = {
+            'from': was, 'dx': bias['dx'], 'dy': bias['dy'],
+            'basis': bias['basis']}
+        entry.update({'pixel': candidate['pixel'], 'corrected': True,
+                      'corrected_by': 'the reading\'s measured displacement',
+                      'measurements': moved, **recheck})
+        if entry.pop('demoted', None) and decision.get('role') == 'unresolved':
+            decision['role'] = 'observed'
+            decision['reason'] = ('moved onto the mark by the displacement measured '
+                                  'across the whole reading; ' +
+                                  str(decision.get('reason', '')))[:900]
+        recovered.append(entry['candidate_id'])
+    return recovered
 
 
 def apply(image_path, interpretation, proposals, review, min_ncc=None,
@@ -101,8 +192,14 @@ def apply(image_path, interpretation, proposals, review, min_ncc=None,
                  'role': decision.get('role'), 'pixel': pixel, **result,
                  'measurements': report}
         threshold = markers.DEFAULT_MATCH_THRESHOLD if min_ncc is None else min_ncc
+        # Measured for every point, passing or not: one point's small miss is
+        # noise, but the same miss on all of them is the reader's own bias.
+        advice = markers.correction(gray, template, pixel['x'], pixel['y'])
+        if advice and advice['score'] >= threshold:
+            entry['offset_to_nearest_match'] = {'dx': advice['dx'], 'dy': advice['dy'],
+                                                'score': advice['score'],
+                                                'glyph_size_px': _glyph_size(template)}
         if not result['passed']:
-            advice = markers.correction(gray, template, pixel['x'], pixel['y'])
             if advice:
                 entry['correction'] = advice
                 moved = markers.patch_report(gray, template, advice['x'], advice['y'])
@@ -129,6 +226,17 @@ def apply(image_path, interpretation, proposals, review, min_ncc=None,
                     f"({result['reason']}); " + str(decision.get('reason', '')))[:900]
                 entry['demoted'] = True
         screens.append(entry)
+    sizes = [e['offset_to_nearest_match']['glyph_size_px'] for e in screens
+             if e.get('offset_to_nearest_match')]
+    bias = systematic_offset(screens, statistics.median(sizes) if sizes else None)
+    if bias:
+        review['systematic_offset'] = bias
+        review.setdefault('notes', []).append(
+            'the reading is displaced as a whole: ' + bias['reading'])
+        bias['recovered'] = _take_off_the_bias(
+            gray, templates, by_id, review, screens, bias,
+            markers.DEFAULT_MATCH_THRESHOLD if min_ncc is None else min_ncc,
+            min_ink_ratio)
     if any(e.get('demoted') for e in screens):
         review['status'] = 'review_required'
         review.setdefault('notes', []).append(

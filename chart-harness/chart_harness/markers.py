@@ -32,6 +32,11 @@ GLYPH_PAD_FRACTION = .003
 PLOT_MARKER_SIDE_FRACTION = .02
 # Windows for judging how crowded a spot is, measured in marker widths.
 OVERLAP_WINDOWS_IN_MARKS = (5, 8, 11)
+# The middle of a glyph, as a share of its side. A filled marker is solid here
+# and an open ring is bare here, so the same measurement taken on the glyph and
+# on the window under a proposed point tells a mark from an empty circle drawn
+# around nothing - without deciding in advance which kind this figure uses.
+GLYPH_CORE_FRACTION = .5
 
 
 def figure_scale(gray):
@@ -454,13 +459,27 @@ def patch_report(gray, template_bbox, x, y):
     patch = gray[top:bottom, left:right]
     template_ink = float(np.count_nonzero(template < INK_LEVEL) / template.size)
     patch_ink = float(np.count_nonzero(patch < INK_LEVEL) / patch.size)
+    core_template, core_patch = _core_ink(template), _core_ink(patch)
     centered = template - template.mean()
     window = patch - patch.mean()
     energy = math.sqrt(float(np.sum(centered ** 2)) * float(np.sum(window ** 2)))
     ncc = float(np.sum(centered * window) / energy) if energy > 1e-8 else None
     return {'status': 'measured', 'ink_fraction': patch_ink,
             'template_ink_fraction': template_ink, 'ncc': ncc,
+            'core_ink_fraction': core_patch,
+            'template_core_ink_fraction': core_template,
             'patch_bbox': [left, top, right, bottom]}
+
+
+def _core_ink(window):
+    """How much of a glyph-sized window's middle is inked."""
+    h, w = window.shape
+    inset_y = int(round(h * (1 - GLYPH_CORE_FRACTION) / 2.))
+    inset_x = int(round(w * (1 - GLYPH_CORE_FRACTION) / 2.))
+    core = window[inset_y:h - inset_y or h, inset_x:w - inset_x or w]
+    if core.size == 0:
+        core = window
+    return float(np.count_nonzero(core < INK_LEVEL) / core.size)
 
 
 def verdict(report, min_ncc=DEFAULT_MATCH_THRESHOLD, min_ink_ratio=.5):
@@ -474,8 +493,17 @@ def verdict(report, min_ncc=DEFAULT_MATCH_THRESHOLD, min_ink_ratio=.5):
     if report['ncc'] is None or report['ncc'] < min_ncc:
         return {'passed': False, 'reason': 'window_does_not_match_legend_glyph',
                 'ncc': report['ncc'], 'min_ncc': min_ncc}
+    # A solid glyph over a hollow window is a circle drawn around nothing: the
+    # rim can carry enough ink to pass on totals while the mark itself is absent.
+    core, core_expected = (report.get('core_ink_fraction'),
+                           report.get('template_core_ink_fraction'))
+    if (core is not None and core_expected is not None
+            and core < min_ink_ratio * core_expected):
+        return {'passed': False, 'reason': 'window_middle_is_empty_where_the_glyph_is_solid',
+                'core_ink_fraction': core, 'expected_core_ink_fraction': core_expected}
     return {'passed': True, 'ncc': report['ncc'],
-            'ink_fraction': report['ink_fraction']}
+            'ink_fraction': report['ink_fraction'],
+            'core_ink_fraction': core}
 
 
 def _words(delta, axis):
